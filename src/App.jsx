@@ -1133,6 +1133,13 @@ export default function App() {
     if (isMobile) {
       setViewMode('grid');
     }
+    
+    // Reset filters on new search to ensure all new results are visible
+    setSelectedFocus('All');
+    setSelectedQuadrant('All');
+    setSelectedLanguages([]);
+    setCurrentPage(1);
+
     setIsScanning(true);
     setConsoleLogs([]);
     setProjects([]);
