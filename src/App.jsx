@@ -1175,6 +1175,21 @@ export default function App() {
     // ── NLP Sentence Pre-parsing ──
     if (searchMode === 'natural' && overrideQuery === null) {
       log('info', `📡 NLP ANALYSIS: Parsing sentence query "${targetQuery}"...`);
+      
+      const clientSideFallback = (query) => {
+        const stopWords = new Set([
+          'i', 'want', 'to', 'learn', 'how', 'wanna', 'understand', 'use', 'can', 'more',
+          'about', 'the', 'a', 'an', 'in', 'on', 'with', 'for', 'of', 'and', 'or', 'is', 'are',
+          'please', 'show', 'me', 'find', 'some', 'any', 'repos', 'repository', 'repositories',
+          'get', 'looking', 'project', 'projects', 'im', 'i\'m', 'wanna'
+        ]);
+        const words = query.toLowerCase()
+          .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, '')
+          .split(/\s+/)
+          .filter(w => w && !stopWords.has(w));
+        return words.slice(0, 3).join(' ') || query;
+      };
+
       try {
         const parseUrl = `/api/parse?q=${encodeURIComponent(targetQuery)}`;
         const parseRes = await fetch(parseUrl);
@@ -1184,10 +1199,14 @@ export default function App() {
           log('success', `💡 NLP EXTRACTED TAGS: "${keywords}"`);
           targetQuery = keywords;
         } else {
-          log('warn', '⚠️ Serverless NLP parser unavailable. Searching using raw sentence terms.');
+          const keywords = clientSideFallback(targetQuery);
+          log('success', `💡 CLIENT-SIDE NLP FALLBACK EXTRACTED: "${keywords}"`);
+          targetQuery = keywords;
         }
       } catch (err) {
-        log('warn', `⚠️ NLP extraction error: ${err.message}. Using raw sentence.`);
+        const keywords = clientSideFallback(targetQuery);
+        log('success', `💡 CLIENT-SIDE NLP FALLBACK EXTRACTED: "${keywords}"`);
+        targetQuery = keywords;
       }
     }
 
