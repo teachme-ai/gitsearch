@@ -399,6 +399,10 @@ export default function App() {
   const [showGuide, setShowGuide] = useState(() => {
     return localStorage.getItem('GIT_OBSERVATORY_GUIDE_SEEN') !== 'true';
   });
+
+  // ── Mobile responsive state ──
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const consoleRef = useRef(null);
 
@@ -408,6 +412,27 @@ export default function App() {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
     }
   }, [consoleLogs]);
+
+  // Track viewport width for mobile layout switching
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(false); // close drawer when expanding to desktop
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Lock body scroll when mobile sidebar drawer is open
+  useEffect(() => {
+    if (isMobile && sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobile, sidebarOpen]);
 
   // Telemetry Calculations
   const telemetry = useMemo(() => {
@@ -1354,8 +1379,29 @@ export default function App() {
       {/* ════ MAIN TELEMETRY INTERFACE ════ */}
       <div className="observatory-main">
         
+        {/* Mobile backdrop — closes sidebar when tapped outside */}
+        {isMobile && sidebarOpen && (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Left Side: Controls & Scanner */}
-        <aside className="observatory-sidebar">
+        <aside className={`observatory-sidebar${isMobile && sidebarOpen ? ' sidebar-open' : ''}`}>
+          {/* Mobile drawer drag handle & close button */}
+          {isMobile && (
+            <div className="mobile-drawer-handle">
+              <div className="drawer-pill" />
+              <button
+                className="drawer-close-btn"
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Close filters"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           
           {/* ── SEARCH — top of sidebar ── */}
           <div className="hud-panel search-primary-panel">
@@ -1829,7 +1875,7 @@ export default function App() {
                     className={`star-card rich-card ${selectedProject?.repo === project.repo ? 'selected' : ''}`}
                     key={idx}
                     style={{ '--focus-color': styles.color, '--focus-glow': styles.glow }}
-                    onClick={() => setSelectedProject(project)}
+                    onClick={() => { setSelectedProject(project); if (isMobile) setSidebarOpen(false); }}
                   >
                     {/* LEFT: text content */}
                     <div className="rich-card-left">
@@ -2048,6 +2094,18 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* ── Mobile FAB: open sidebar drawer ── */}
+      {isMobile && !sidebarOpen && (
+        <button
+          className="mobile-fab"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open search & filters"
+        >
+          <span className="fab-icon">⚙</span>
+          <span className="fab-label">{isScanning ? 'Scanning…' : projects.length > 0 ? `Filters · ${filteredProjects.length}` : 'Search & Filters'}</span>
+        </button>
+      )}
 
       {/* ════ PROJECT INSPECTOR DETAILS PANEL ════ */}
       <aside className={`project-inspector ${selectedProjectDetails ? 'active' : ''}`} style={selectedProjectDetails ? {

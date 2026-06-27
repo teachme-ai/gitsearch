@@ -1346,13 +1346,262 @@ input[type="password"]:focus {
   .observatory-main { grid-template-columns: 340px 1fr; }
 }
 
-@media (max-width: 860px) {
-  .observatory-main { grid-template-columns: 1fr; }
+/* ════ TABLET (768px – 1100px) ════ */
+@media (max-width: 1100px) {
+  .observatory-container { padding: 16px 24px 32px; }
+  .observatory-main { grid-template-columns: 300px 1fr; }
+}
+
+@media (max-width: 900px) {
+  .observatory-container { padding: 12px 16px 32px; }
+  .observatory-main { grid-template-columns: 1fr; gap: 14px; }
   .observatory-sidebar { position: static; }
-  .telemetry-hud { grid-template-columns: 1fr; }
+  .telemetry-hud { grid-template-columns: 1fr 1fr; }
   .hud-card { border-right: none; border-bottom: 1px solid var(--border); }
-  .hud-card:last-child { border-bottom: none; }
+  .hud-card:nth-child(odd) { border-right: 1px solid var(--border); }
+  .hud-card:last-child { border-bottom: none; border-right: none; }
   .project-inspector { width: 100%; }
   .rich-card { flex-direction: column !important; }
   .rich-card-chart { width: 100%; flex-direction: row; }
+  .galaxy-map-deck { min-height: 480px; }
+}
+
+/* ════ MOBILE — SIDEBAR DRAWER PATTERN (< 768px) ════ */
+@media (max-width: 768px) {
+
+  /* ── Base container ── */
+  .observatory-container {
+    padding: 10px 12px 100px; /* bottom pad so FAB doesn't overlap last card */
+    gap: 12px;
+  }
+
+  /* ── Branding header ── */
+  .observatory-container > div:first-child {
+    padding: 14px 14px !important;
+    border-radius: 6px;
+  }
+
+  /* Shrink h1 */
+  .observatory-container h1 {
+    font-size: 20px !important;
+    letter-spacing: -0.01em !important;
+  }
+
+  /* Stack the header row vertically */
+  .observatory-container > div:first-child > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* Compact guide grid */
+  .observatory-container > div:first-child + div {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Main layout: single column, no gap ── */
+  .observatory-main {
+    grid-template-columns: 1fr;
+    gap: 0;
+    position: relative;
+  }
+
+  /* ── SIDEBAR DRAWER ── */
+  /* On mobile the sidebar is hidden off-screen at the bottom */
+  .observatory-sidebar {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-height: 88vh !important;
+    overflow-y: auto !important;
+    background: var(--bg-subtle) !important;
+    border-top: 1px solid var(--border) !important;
+    border-radius: 16px 16px 0 0 !important;
+    transform: translateY(100%) !important;
+    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    z-index: 600 !important;
+    padding: 0 12px 24px !important;
+    gap: 12px !important;
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.6) !important;
+  }
+
+  /* Open state — slides into view */
+  .observatory-sidebar.sidebar-open {
+    transform: translateY(0) !important;
+  }
+
+  /* ── Drawer handle & close button ── */
+  .mobile-drawer-handle {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 4px 6px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-subtle);
+    z-index: 2;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+
+  .drawer-pill {
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto;
+    flex: 1;
+    margin-left: 32px;
+  }
+
+  .drawer-close-btn {
+    background: var(--bg-overlay);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .drawer-close-btn:hover { background: var(--bg-canvas); color: var(--text-primary); }
+
+  /* ── Backdrop overlay ── */
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 599;
+    backdrop-filter: blur(2px);
+  }
+
+  /* ── Mobile FAB ── */
+  .mobile-fab {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--gh-blue);
+    color: #fff;
+    border: none;
+    border-radius: 24px;
+    padding: 12px 22px;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    z-index: 598;
+    box-shadow: 0 4px 20px rgba(88, 166, 255, 0.45), 0 2px 8px rgba(0,0,0,0.5);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+  .mobile-fab:active {
+    transform: translateX(-50%) scale(0.96);
+    box-shadow: 0 2px 10px rgba(88, 166, 255, 0.3);
+  }
+  .fab-icon { font-size: 15px; }
+  .fab-label { font-size: 13px; }
+
+  /* ── Main content area takes full width ── */
+  .stars-quadrant,
+  .stars-quadrant-map-container {
+    width: 100%;
+    min-height: auto !important;
+  }
+
+  /* ── Compact inline metrics row ── */
+  .stars-quadrant > div:first-child,
+  .stars-quadrant-map-container > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    padding: 8px 12px !important;
+  }
+
+  /* ── Galaxy map: smaller on mobile ── */
+  .galaxy-map-deck { min-height: 300px; }
+
+  /* ── Rich cards: stack chart panel below text ── */
+  .rich-card {
+    flex-direction: column !important;
+    min-height: auto !important;
+  }
+  .rich-card-left { border-right: none !important; border-bottom: 1px solid var(--border); }
+  .rich-card-chart {
+    width: 100% !important;
+    flex-direction: row !important;
+    border-left: none !important;
+    border-top: 2px solid var(--focus-color, var(--gh-blue)) !important;
+    padding: 10px 14px !important;
+    gap: 12px !important;
+    flex-wrap: wrap;
+  }
+
+  /* ── Filter pills: larger touch target ── */
+  .filter-btn {
+    padding: 7px 14px !important;
+    font-size: 12px !important;
+    min-height: 36px;
+  }
+
+  /* ── Pagination ── */
+  .pagination-controls { gap: 8px; }
+  .page-btn { padding: 8px 18px !important; font-size: 13px !important; min-height: 40px; }
+
+  /* ── Telemetry HUD: 2-col on mobile ── */
+  .telemetry-hud { grid-template-columns: 1fr 1fr; }
+  .hud-card { padding: 12px 14px; }
+  .hud-card .hud-value { font-size: 1.4rem; }
+  .hud-card { border-right: none; border-bottom: 1px solid var(--border); }
+  .hud-card:nth-child(odd) { border-right: 1px solid var(--border); }
+  .hud-card:last-child { border-bottom: none; }
+
+  /* ── Project inspector: full screen on mobile ── */
+  .project-inspector {
+    width: 100% !important;
+    border-left: none !important;
+    border-top: 1px solid var(--border) !important;
+  }
+
+  /* ── HUD panels inside drawer ── */
+  .hud-panel { padding: 14px 12px; }
+
+  /* ── Search row ── */
+  .search-row { border-radius: var(--radius); }
+  .search-input-primary { font-size: 15px !important; padding: 12px 14px 12px 40px !important; }
+  .scan-trigger-btn { padding: 0 14px !important; font-size: 14px !important; }
+
+  /* ── Console panel: smaller on mobile ── */
+  .console-panel > div:last-child { height: 60px !important; }
+
+  /* ── Stars slider bigger touch target ── */
+  .stars-slider { height: 6px; }
+  .stars-slider::-webkit-slider-thumb { width: 20px; height: 20px; }
+
+  /* ── No-results overlay ── */
+  .no-stars-overlay { padding: 20px 16px; }
+  .no-stars-overlay h3 { font-size: 14px; }
+  .no-stars-overlay p { font-size: 12px; }
+
+  /* ── Inspector metrics 2-col on mobile ── */
+  .metrics-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* Hide drawer handle on desktop */
+@media (min-width: 769px) {
+  .mobile-drawer-handle { display: none !important; }
+  .sidebar-backdrop { display: none !important; }
+  .mobile-fab { display: none !important; }
 }
