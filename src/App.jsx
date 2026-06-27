@@ -1152,19 +1152,29 @@ export default function App() {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <h1 style={{
-                margin: 0,
-                fontSize: '28px',
-                fontWeight: 850,
-                color: 'var(--text-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                letterSpacing: '-0.02em'
-              }}>
-                🛰️ Git Observatory
-              </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <img 
+                  src="/social-share.png" 
+                  alt="Git Observatory Logo" 
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(88,166,255,0.3)',
+                    boxShadow: '0 0 10px rgba(88,166,255,0.15)'
+                  }}
+                />
+                <h1 style={{
+                  margin: 0,
+                  fontSize: '28px',
+                  fontWeight: 850,
+                  color: 'var(--text-primary)',
+                  letterSpacing: '-0.02em'
+                }}>
+                  Git Observatory
+                </h1>
+              </div>
               <a 
                 href="https://www.linkedin.com/in/khalidirfan"
                 target="_blank"
@@ -1336,9 +1346,22 @@ export default function App() {
           
           {/* ── SEARCH — top of sidebar ── */}
           <div className="hud-panel search-primary-panel">
-            <div className="app-wordmark">
-              <span className="app-wordmark-title">🛰️ Git Observatory</span>
-              <span className="app-wordmark-sub">Real-time repository search, semantic ranking &amp; health telemetry</span>
+            <div className="app-wordmark" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+              <img 
+                src="/social-share.png" 
+                alt="Logo" 
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(88,166,255,0.25)',
+                  flexShrink: 0
+                }}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                <span className="app-wordmark-title" style={{ fontSize: '15px', fontWeight: 800 }}>Git Observatory</span>
+                <span className="app-wordmark-sub" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Real-time repository search &amp; health telemetry</span>
+              </div>
             </div>
             <div className="search-mode-selector" style={{
               display: 'flex',
