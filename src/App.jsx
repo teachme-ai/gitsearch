@@ -1473,7 +1473,7 @@ export default function App() {
 
           {/* Controls Panel */}
           <div className="hud-panel">
-            <span className="hud-panel-title">telemetry deck controls</span>
+            <span className="hud-panel-title">Observatory Controls</span>
 
             {/* View Mode Toggle */}
             <div className="hud-group">
@@ -1483,13 +1483,13 @@ export default function App() {
                   className={`filter-btn ${viewMode === 'grid' ? 'active' : ''}`}
                   onClick={() => setViewMode('grid')}
                 >
-                  🎛️ Telemetry Grid
+                  田 Grid View
                 </button>
                 <button
                   className={`filter-btn ${viewMode === 'map' ? 'active' : ''}`}
                   onClick={() => setViewMode('map')}
                 >
-                  🎯 Telemetry Matrix
+                  ◰ Matrix View
                 </button>
               </div>
             </div>
