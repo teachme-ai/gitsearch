@@ -94,26 +94,40 @@ function buildSearchAtoms(rawQuery, limit = 6) {
 }
 
 function buildRepositorySearchQuery(rawQuery) {
-  const atoms = buildSearchAtoms(rawQuery, 6);
-  if (atoms.length === 0) return '';
-  return `(${atoms.join(' OR ')}) in:name,description,readme archived:false`;
-}
-
-function buildRecoverySearchQuery(rawQuery) {
   const terms = (rawQuery || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
-  const recoveryTerms = [];
+  if (terms.length === 0) return '';
 
-  for (const term of terms.slice(0, 3)) {
-    recoveryTerms.push(quoteGitHubSearchTerm(term));
+  const clauses = [];
+  for (const term of terms) {
+    const termAtoms = new Set();
+    const cleanTerm = quoteGitHubSearchTerm(term);
+    if (!cleanTerm) continue;
+    
+    termAtoms.add(cleanTerm);
+    
     const extras = QUERY_EXPANSIONS[term] || [];
-    for (const extra of extras.slice(0, 1)) {
-      recoveryTerms.push(quoteGitHubSearchTerm(extra));
+    for (const extra of extras) {
+      const cleanExtra = quoteGitHubSearchTerm(extra);
+      if (cleanExtra && !cleanExtra.includes('"')) {
+        termAtoms.add(cleanExtra);
+      }
+    }
+    
+    if (termAtoms.size > 1) {
+      clauses.push(`(${Array.from(termAtoms).join(' OR ')})`);
+    } else {
+      clauses.push(cleanTerm);
     }
   }
 
-  const compact = Array.from(new Set(recoveryTerms)).filter(Boolean);
-  if (compact.length === 0) return '';
-  return `(${compact.join(' OR ')}) in:name,description,readme archived:false`;
+  if (clauses.length === 0) return '';
+  return `${clauses.join(' ')} in:name,description archived:false`;
+}
+
+function buildRecoverySearchQuery(rawQuery) {
+  const primary = buildRepositorySearchQuery(rawQuery);
+  if (!primary) return '';
+  return primary.replace('in:name,description', 'in:name,description,readme');
 }
 
 function buildBroadenedQuery(rawQuery) {
