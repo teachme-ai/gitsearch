@@ -374,7 +374,7 @@ export default function App() {
   const [minStars, setMinStars] = useState(0);
   const [selectedFocus, setSelectedFocus] = useState('All');
   const [selectedQuadrant, setSelectedQuadrant] = useState('All');
-  const [selectedLanguage, setSelectedLanguage] = useState('All');
+  const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [hoveredProject, setHoveredProject] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
@@ -537,16 +537,16 @@ export default function App() {
     return projects.filter(project => {
       const matchesFocus = selectedFocus === 'All' || project.focus === selectedFocus;
       const matchesSector = getSectorFilter(selectedQuadrant, project);
-      const matchesLanguage = selectedLanguage === 'All' || 
-        (project.primaryLanguage && project.primaryLanguage.toLowerCase() === selectedLanguage.toLowerCase());
+      const matchesLanguage = selectedLanguages.length === 0 || 
+        (project.primaryLanguage && selectedLanguages.some(lang => lang.toLowerCase() === project.primaryLanguage.toLowerCase()));
       return matchesFocus && matchesSector && matchesLanguage;
     });
-  }, [projects, selectedFocus, selectedQuadrant, selectedLanguage]);
+  }, [projects, selectedFocus, selectedQuadrant, selectedLanguages]);
 
   // Reset to page 1 whenever filters or results change
   useEffect(() => {
     setCurrentPage(1);
-  }, [projects, selectedFocus, selectedQuadrant, selectedLanguage]);
+  }, [projects, selectedFocus, selectedQuadrant, selectedLanguages]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -728,8 +728,9 @@ export default function App() {
     if (minStars > 0) {
       finalQuery += ` stars:>=${minStars}`;
     }
-    if (selectedLanguage !== 'All') {
-      finalQuery += ` language:${selectedLanguage}`;
+    if (selectedLanguages.length > 0) {
+      const langClauses = selectedLanguages.map(lang => `language:${lang}`).join(' OR ');
+      finalQuery += ` (${langClauses})`;
     }
     log('info', `Search: "${finalQuery}"`);
 
@@ -1547,29 +1548,39 @@ export default function App() {
               </div>
             </div>
 
-            {/* Language filter selector */}
+            {/* Language filter selector — Multi-select Pills */}
             <div className="hud-group">
-              <span className="hud-group-label">Primary Tech Stack</span>
-              <select
-                value={selectedLanguage}
-                onChange={e => setSelectedLanguage(e.target.value)}
-                className="hud-select"
-                style={{
-                  width: '100%',
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-main)',
-                  border: '1px solid var(--border)',
-                  padding: '8px',
-                  borderRadius: '6px',
-                  outline: 'none',
-                  fontSize: '0.85rem',
-                  fontFamily: 'var(--font-mono)'
-                }}
-              >
-                {['All', 'Python', 'JavaScript', 'TypeScript', 'Rust', 'Go', 'C++', 'Java', 'Shell', 'HTML', 'CSS', 'Svelte', 'Vue'].map(lang => (
-                  <option key={lang} value={lang}>{lang}</option>
-                ))}
-              </select>
+              <span className="hud-group-label" style={{ marginBottom: '8px', display: 'block' }}>Primary Tech Stack</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <button
+                  className={`filter-btn ${selectedLanguages.length === 0 ? 'active' : ''}`}
+                  onClick={() => setSelectedLanguages([])}
+                  style={{ fontSize: '0.72rem', padding: '5px 10px' }}
+                >
+                  All
+                </button>
+                {['Python', 'JavaScript', 'TypeScript', 'Rust', 'Go', 'C++', 'Java', 'Shell', 'HTML', 'CSS', 'Svelte', 'Vue'].map(lang => {
+                  const isSelected = selectedLanguages.includes(lang);
+                  return (
+                    <button
+                      key={lang}
+                      className={`filter-btn ${isSelected ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedLanguages(prev => {
+                          if (prev.includes(lang)) {
+                            return prev.filter(l => l !== lang);
+                          } else {
+                            return [...prev, lang];
+                          }
+                        });
+                      }}
+                      style={{ fontSize: '0.72rem', padding: '5px 10px' }}
+                    >
+                      {lang}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
