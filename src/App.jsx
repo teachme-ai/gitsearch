@@ -1166,7 +1166,7 @@ export default function App() {
                 🛰️ Git Observatory
               </h1>
               <a 
-                href="https://github.com/teachme-ai"
+                href="https://www.linkedin.com/in/khalidirfan"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -1186,7 +1186,7 @@ export default function App() {
                 }}
                 className="created-by-badge"
               >
-                <span>Created by</span> <strong>teachme.ai</strong>
+                <span>Created by</span> <strong>Khalid Irfan</strong>
               </a>
             </div>
             <p style={{
