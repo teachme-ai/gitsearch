@@ -434,6 +434,15 @@ export default function App() {
     return () => { document.body.style.overflow = ''; };
   }, [isMobile, sidebarOpen]);
 
+  // The matrix labels get cramped on phones, so mobile always returns to the list.
+  useEffect(() => {
+    if (isMobile && viewMode === 'map') {
+      setViewMode('grid');
+    }
+  }, [isMobile, viewMode]);
+
+  const activeViewMode = isMobile ? 'grid' : viewMode;
+
   // Telemetry Calculations
   const telemetry = useMemo(() => {
     const total = projects.length;
@@ -698,6 +707,10 @@ export default function App() {
   // Trigger Real-Time GitHub API Live Search & Telemetry Analysis
   const performGitHubSearch = async (overrideQuery = null) => {
     if (isScanning) return;
+    if (isMobile) {
+      setSidebarOpen(false);
+      setViewMode('grid');
+    }
     setIsScanning(true);
     setConsoleLogs([]);
     setProjects([]);
@@ -1300,6 +1313,42 @@ export default function App() {
           )}
         </div>
 
+        {isMobile && (
+          <div className="mobile-inline-search">
+            <div className="mobile-inline-search-row">
+              <input
+                type="text"
+                className="mobile-inline-search-input"
+                placeholder={
+                  searchMode === 'natural'
+                    ? "What do you want to build?"
+                    : searchMode === 'profile'
+                      ? "GitHub profile ID"
+                      : "Search repositories..."
+                }
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') performGitHubSearch(searchQuery);
+                }}
+              />
+              <button
+                className={`mobile-inline-scan ${isScanning ? 'scanning' : ''}`}
+                onClick={() => performGitHubSearch(searchQuery)}
+                disabled={isScanning}
+              >
+                {isScanning ? 'Scanning' : 'Scan'}
+              </button>
+            </div>
+            <button
+              className="mobile-inline-filter"
+              onClick={() => setSidebarOpen(true)}
+            >
+              Search mode, filters, and token
+            </button>
+          </div>
+        )}
+
         {showGuide && (
           <div style={{
             background: 'var(--bg-canvas)',
@@ -1565,24 +1614,25 @@ export default function App() {
           <div className="hud-panel">
             <span className="hud-panel-title">Observatory Controls</span>
 
-            {/* View Mode Toggle */}
-            <div className="hud-group">
-              <span className="hud-group-label">View Mode</span>
-              <div className="filter-pills">
-                <button
-                  className={`filter-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                  onClick={() => setViewMode('grid')}
-                >
-                  田 Grid View
-                </button>
-                <button
-                  className={`filter-btn ${viewMode === 'map' ? 'active' : ''}`}
-                  onClick={() => setViewMode('map')}
-                >
-                  ◰ Matrix View
-                </button>
+            {!isMobile && (
+              <div className="hud-group">
+                <span className="hud-group-label">View Mode</span>
+                <div className="filter-pills">
+                  <button
+                    className={`filter-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                    onClick={() => setViewMode('grid')}
+                  >
+                    田 Grid View
+                  </button>
+                  <button
+                    className={`filter-btn ${viewMode === 'map' ? 'active' : ''}`}
+                    onClick={() => setViewMode('map')}
+                  >
+                    ◰ Matrix View
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Ownership Type filter */}
             <div className="hud-group">
@@ -1710,7 +1760,7 @@ export default function App() {
         </aside>
 
         {/* Right Side: Telemetry Matrix or Grid */}
-        <main className={viewMode === 'map' ? 'stars-quadrant-map-container' : 'stars-quadrant'}>
+        <main className={`${activeViewMode === 'map' ? 'stars-quadrant-map-container' : 'stars-quadrant'} ${filteredProjects.length === 0 ? 'is-empty' : ''}`}>
           
           {/* Integrated Compact Telemetry Metrics Row */}
           <div style={{
@@ -1726,7 +1776,7 @@ export default function App() {
             gap: '12px',
             width: '100%'
           }}>
-            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', width: '100%', minWidth: 0 }}>
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                 Observed: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{telemetry.total}</strong>
               </span>
@@ -1734,7 +1784,7 @@ export default function App() {
                 Avg Velocity: <strong style={{ color: 'var(--gh-blue)', fontFamily: 'var(--font-mono)' }}>★ {telemetry.avgVelocity}/day</strong>
               </span>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '100%', minWidth: 0 }}>
               Focus: <span style={{ color: 'var(--neon-cyan)', fontWeight: 600 }}>E: {telemetry.shares.enterprise}%</span>
               {' · '}
               <span style={{ color: 'var(--neon-emerald)', fontWeight: 600 }}>I: {telemetry.shares.individual}%</span>
@@ -1743,7 +1793,7 @@ export default function App() {
             </div>
           </div>
 
-          {viewMode === 'map' ? (
+          {activeViewMode === 'map' ? (
             <div className="galaxy-map-deck">
               {/* Telemetry Matrix Grid axes and crosshairs */}
               <div className="matrix-crosshair-h" />
@@ -1879,16 +1929,112 @@ export default function App() {
                   >
                     {/* LEFT: text content */}
                     <div className="rich-card-left">
-                      <div className="tag-row">
-                        <span className="quadrant-badge">{project.theme.replace('RAG and knowledge systems', 'RAG')}</span>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <span className={`status-badge ${statusInfo.className}`} style={{ scale: '0.85' }}>{statusInfo.label}</span>
-                          <span className={`focus-tag ${project.focus.toLowerCase()}`}>{project.focus}</span>
+                      <div className="rich-card-overview">
+                        <div className="rich-card-summary">
+                          <div className="tag-row">
+                            <span className="quadrant-badge">{project.theme.replace('RAG and knowledge systems', 'RAG')}</span>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <span className={`status-badge ${statusInfo.className}`} style={{ scale: '0.85' }}>{statusInfo.label}</span>
+                              <span className={`focus-tag ${project.focus.toLowerCase()}`}>{project.focus}</span>
+                            </div>
+                          </div>
+
+                          <h3 className="rich-card-title">{project.repo}</h3>
+                          <p className="rich-card-desc">{project.description || project.call_to_action}</p>
+                        </div>
+                        {/* Corner telemetry mini-panel */}
+                        <div className="rich-card-chart">
+                          <span className="chart-label">trajectory</span>
+
+                          {/* Star velocity sparkline */}
+                          {(() => {
+                            const vel = project.starVelocity || 0;
+                            const stars = project.stars || 0;
+                            const commits = project.commits || 0;
+                            const pts = 14;
+                            const vals = Array.from({ length: pts }, (_, i) => {
+                              const t = i / (pts - 1);
+                              if (stars === 0) {
+                                return 0;
+                              }
+
+                              let base;
+                              if (vel > 2.0) {
+                                base = 0.2 + 0.8 * Math.pow(t, 1 / Math.max(0.4, vel * 0.2 + 0.6));
+                              } else {
+                                base = 0.65 + (t * 0.15) - 0.05;
+                              }
+
+                              const activityFactor = Math.min(15, commits) / 15;
+                              const noise = Math.sin(i * 1.8 + stars) * 0.04 * activityFactor;
+                              return Math.max(5, Math.min(95, (base + noise) * 100));
+                            });
+                            const W = 112, H = 34;
+                            const toX = (i) => (i / (pts - 1)) * W;
+                            const toY = (v) => H - (v / 100) * (H - 6) - 3;
+                            const pathD = vals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${toX(i).toFixed(1)} ${toY(v).toFixed(1)}`).join(' ');
+                            const areaD = `${pathD} L ${W} ${H} L 0 ${H} Z`;
+                            const lastX = toX(pts - 1);
+                            const lastY = toY(vals[pts - 1]);
+                            return (
+                              <svg viewBox={`0 0 ${W} ${H}`} className="sparkline-svg" preserveAspectRatio="none">
+                                <defs>
+                                  <linearGradient id={`sg-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="var(--focus-color)" stopOpacity="0.4" />
+                                    <stop offset="100%" stopColor="var(--focus-color)" stopOpacity="0" />
+                                  </linearGradient>
+                                </defs>
+                                <line x1="0" y1={H - 1} x2={W} y2={H - 1} stroke="var(--border)" strokeWidth="0.5" />
+                                <path d={areaD} fill={`url(#sg-${idx})`} />
+                                <path d={pathD} fill="none" stroke="var(--focus-color)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                <circle cx={lastX} cy={lastY} r="2" fill="var(--focus-color)" />
+                                <circle cx={lastX} cy={lastY} r="4" fill="var(--focus-color)" opacity="0.18" />
+                              </svg>
+                            );
+                          })()}
+
+                          {project.languageNames?.length > 0 && (
+                            <div className="chart-lang-section">
+                              <span className="chart-label" style={{ marginBottom: '4px' }}>tech stack</span>
+                              <div className="chart-lang-bar">
+                                {project.languageNames.map((lang, li) => (
+                                  <div
+                                    key={li}
+                                    className="chart-lang-segment"
+                                    title={`${lang.name} ${(lang.pct * 100).toFixed(1)}%`}
+                                    style={{
+                                      width: `${lang.pct * 100}%`,
+                                      background: getLangColor(lang.name),
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                              <div className="chart-lang-legend">
+                                {project.languageNames.slice(0, 2).map((lang, li) => (
+                                  <span key={li} className="chart-lang-dot">
+                                    <span style={{ background: getLangColor(lang.name) }} className="lang-dot-circle" />
+                                    <span className="lang-dot-name">{lang.name}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="chart-stats">
+                            <span className="chart-stat-item" style={{ color: 'var(--focus-color)' }}>
+                              ▲ {Number(project.starVelocity).toFixed(1)}<span style={{ opacity: 0.6, fontSize: '9px' }}>/d</span>
+                            </span>
+                            {project.bm25Score != null && (
+                              <span className="chart-stat-item" style={{ color: 'var(--text-muted)', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <span style={{ opacity: 0.5 }}>relevance</span>
+                                <span style={{ color: project.bm25Score > 0.6 ? 'var(--gh-green)' : project.bm25Score > 0.3 ? 'var(--gh-orange)' : 'var(--text-muted)' }}>
+                                  {(project.bm25Score * 100).toFixed(0)}%
+                                </span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-
-                      <h3 className="rich-card-title">{project.repo}</h3>
-                      <p className="rich-card-desc">{project.description || project.call_to_action}</p>
 
                       <div className="stat-pills">
                         <div className="stat-pill">
@@ -1925,137 +2071,6 @@ export default function App() {
                           />
                         </div>
                         <span className="score-bar-value">{Number(project.score).toFixed(0)}</span>
-                      </div>
-                    </div>
-
-                    {/* RIGHT: Sparkline mini-chart panel */}
-                    <div className="rich-card-chart">
-                      <span className="chart-label">trajectory</span>
-
-                      {/* Star velocity sparkline */}
-                      {(() => {
-                        const vel = project.starVelocity || 0;
-                        const stars = project.stars || 0;
-                        const commits = project.commits || 0;
-                        const pts = 14;
-                        const vals = Array.from({ length: pts }, (_, i) => {
-                          const t = i / (pts - 1);
-                          if (stars === 0) {
-                            return 0; // Flat line at the bottom for 0 stars
-                          }
-                          
-                          let base;
-                          if (vel > 2.0) {
-                            // Exponential climb for high-growth repos
-                            base = 0.2 + 0.8 * Math.pow(t, 1 / Math.max(0.4, vel * 0.2 + 0.6));
-                          } else {
-                            // Flat-ish/stable line for existing repos with low velocity
-                            base = 0.65 + (t * 0.15) - 0.05;
-                          }
-                          
-                          // Organic fluctuations relative to commit activity
-                          const activityFactor = Math.min(15, commits) / 15;
-                          const noise = Math.sin(i * 1.8 + stars) * 0.04 * activityFactor;
-                          return Math.max(5, Math.min(95, (base + noise) * 100));
-                        });
-                        const W = 130, H = 52;
-                        const toX = (i) => (i / (pts - 1)) * W;
-                        const toY = (v) => H - (v / 100) * (H - 6) - 3;
-                        const pathD = vals.map((v, i) => `${i === 0 ? 'M' : 'L'} ${toX(i).toFixed(1)} ${toY(v).toFixed(1)}`).join(' ');
-                        const areaD = `${pathD} L ${W} ${H} L 0 ${H} Z`;
-                        const lastX = toX(pts - 1);
-                        const lastY = toY(vals[pts - 1]);
-                        return (
-                          <svg viewBox={`0 0 ${W} ${H}`} className="sparkline-svg" preserveAspectRatio="none">
-                            <defs>
-                              <linearGradient id={`sg-${idx}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="var(--focus-color)" stopOpacity="0.4" />
-                                <stop offset="100%" stopColor="var(--focus-color)" stopOpacity="0" />
-                              </linearGradient>
-                            </defs>
-                            {/* Baseline grid tick */}
-                            <line x1="0" y1={H - 1} x2={W} y2={H - 1} stroke="var(--border)" strokeWidth="0.5" />
-                            {/* Area fill */}
-                            <path d={areaD} fill={`url(#sg-${idx})`} />
-                            {/* Trajectory line */}
-                            <path d={pathD} fill="none" stroke="var(--focus-color)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            {/* Live endpoint dot */}
-                            <circle cx={lastX} cy={lastY} r="2.5" fill="var(--focus-color)" />
-                            <circle cx={lastX} cy={lastY} r="5" fill="var(--focus-color)" opacity="0.18" />
-                          </svg>
-                        );
-                      })()}
-
-                      {/* Commit activity replaced by checkmygit-style language stack bar */}
-                      {project.languageNames?.length > 0 && (
-                        <div className="chart-lang-section">
-                          <span className="chart-label" style={{ marginBottom: '4px' }}>tech stack</span>
-                          {/* Proportional language bar — inspired by checkmygit's donut */}
-                          <div className="chart-lang-bar">
-                            {project.languageNames.map((lang, li) => (
-                              <div
-                                key={li}
-                                className="chart-lang-segment"
-                                title={`${lang.name} ${(lang.pct * 100).toFixed(1)}%`}
-                                style={{
-                                  width: `${lang.pct * 100}%`,
-                                  background: getLangColor(lang.name),
-                                }}
-                              />
-                            ))}
-                          </div>
-                          {/* Language legend — top 3 */}
-                          <div className="chart-lang-legend">
-                            {project.languageNames.slice(0, 3).map((lang, li) => (
-                              <span key={li} className="chart-lang-dot">
-                                <span style={{ background: getLangColor(lang.name) }} className="lang-dot-circle" />
-                                <span className="lang-dot-name">{lang.name}</span>
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Top contributors — checkmygit avatar circles */}
-                      {project.contributors?.length > 0 && (
-                        <div className="chart-contrib-row">
-                          <span className="chart-label">contributors</span>
-                          <div className="chart-contrib-avatars">
-                            {project.contributors.map((c, ci) => (
-                              <a
-                                key={ci}
-                                href={c.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={`${c.login} (${c.contributions} commits)`}
-                                className="contrib-avatar-link"
-                                onClick={e => e.stopPropagation()}
-                              >
-                                <img
-                                  src={`${c.avatar}&s=48`}
-                                  alt={c.login}
-                                  className="contrib-avatar"
-                                  loading="lazy"
-                                />
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Velocity + BM25 relevance score */}
-                      <div className="chart-stats">
-                        <span className="chart-stat-item" style={{ color: 'var(--focus-color)' }}>
-                          ▲ {Number(project.starVelocity).toFixed(1)}<span style={{ opacity: 0.6, fontSize: '9px' }}>/d</span>
-                        </span>
-                        {project.bm25Score != null && (
-                          <span className="chart-stat-item" style={{ color: 'var(--text-muted)', fontSize: '9px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <span style={{ opacity: 0.5 }}>relevance</span>
-                            <span style={{ color: project.bm25Score > 0.6 ? 'var(--gh-green)' : project.bm25Score > 0.3 ? 'var(--gh-orange)' : 'var(--text-muted)' }}>
-                              {(project.bm25Score * 100).toFixed(0)}%
-                            </span>
-                          </span>
-                        )}
                       </div>
                     </div>
                   </article>
@@ -2371,7 +2386,7 @@ export default function App() {
                         <button
                           key={li}
                           onClick={() => {
-                            setSelectedLanguage(lang.name);
+                            setSelectedLanguages([lang.name]);
                             setConsoleLogs(prev => [...prev, { type: 'info', text: `🎯 Filtered Tech Stack to: ${lang.name}` }]);
                           }}
                           style={{

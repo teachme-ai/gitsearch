@@ -726,9 +726,22 @@ input[type="password"]:focus {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   padding: 14px 16px;
-  border-right: 1px solid var(--border);
+  min-width: 0;
+}
+
+.rich-card-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 12px;
+  align-items: start;
+}
+
+.rich-card-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -779,18 +792,22 @@ input[type="password"]:focus {
 
 /* Sparkline chart panel */
 .rich-card-chart {
-  width: 148px;
-  flex-shrink: 0;
+  width: 100px;
+  max-width: 100px;
+  flex: 0 0 100px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
-  gap: 7px;
-  padding: 14px 12px;
-  background: var(--bg-muted);
-  border-left: 2px solid var(--focus-color);
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 8px 8px 7px;
+  background: rgba(28, 33, 40, 0.92);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--focus-color);
+  border-radius: var(--radius);
   position: relative;
   overflow: hidden;
+  align-self: start;
 }
 
 /* Subtle dot-grid texture on the chart bg */
@@ -804,10 +821,10 @@ input[type="password"]:focus {
 }
 
 .chart-label {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   font-weight: 600;
   align-self: flex-start;
   position: relative;
@@ -816,7 +833,7 @@ input[type="password"]:focus {
 
 .sparkline-svg {
   width: 100%;
-  height: 52px;
+  height: 26px;
   overflow: visible;
   position: relative;
   z-index: 1;
@@ -843,7 +860,7 @@ input[type="password"]:focus {
 .chart-stats {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   align-self: flex-start;
   width: 100%;
   position: relative;
@@ -851,9 +868,9 @@ input[type="password"]:focus {
 }
 .chart-stat-item {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.2;
 }
 
 /* checkmygit-inspired stack visualizations */
@@ -867,12 +884,12 @@ input[type="password"]:focus {
 
 .chart-lang-bar {
   display: flex;
-  height: 4px;
+  height: 2px;
   width: 100%;
   border-radius: 2px;
   overflow: hidden;
   background: var(--bg-overlay);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .chart-lang-segment {
@@ -883,15 +900,15 @@ input[type="password"]:focus {
 .chart-lang-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 3px;
   width: 100%;
 }
 
 .chart-lang-dot {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 9px;
+  gap: 2px;
+  font-size: 8px;
   color: var(--text-secondary);
 }
 
@@ -906,15 +923,11 @@ input[type="password"]:focus {
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  max-width: 48px;
+  max-width: 32px;
 }
 
 .chart-contrib-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 100%;
-  z-index: 1;
+  display: none;
 }
 
 .chart-contrib-avatars {
@@ -1394,9 +1407,74 @@ input[type="password"]:focus {
     gap: 8px !important;
   }
 
+  .mobile-inline-search {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 2px;
+  }
+
+  .mobile-inline-search-row {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--bg-canvas);
+  }
+
+  .mobile-inline-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    padding: 12px 12px;
+  }
+
+  .mobile-inline-search-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .mobile-inline-scan {
+    flex-shrink: 0;
+    border: none;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    background: #238636;
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 16px;
+    cursor: pointer;
+  }
+
+  .mobile-inline-scan.scanning,
+  .mobile-inline-scan:disabled {
+    background: #1f6feb;
+    opacity: 0.8;
+  }
+
+  .mobile-inline-filter {
+    align-self: flex-start;
+    border: none;
+    background: transparent;
+    color: var(--gh-blue);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0;
+    cursor: pointer;
+  }
+
   /* Compact guide grid */
-  .observatory-container > div:first-child + div {
+  .observatory-container > div:first-child > div:nth-child(3),
+  .observatory-container > div:first-child > div:nth-child(2):last-child {
     grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    padding: 12px 14px !important;
   }
 
   /* ── Main layout: single column, no gap ── */
@@ -1519,34 +1597,83 @@ input[type="password"]:focus {
   .stars-quadrant-map-container {
     width: 100%;
     min-height: auto !important;
+    min-width: 0;
+  }
+
+  .stars-quadrant.is-empty {
+    padding: 12px;
+    gap: 10px;
   }
 
   /* ── Compact inline metrics row ── */
   .stars-quadrant > div:first-child,
   .stars-quadrant-map-container > div:first-child {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 6px !important;
     padding: 8px 12px !important;
   }
 
+  .stars-quadrant > div:first-child > div,
+  .stars-quadrant-map-container > div:first-child > div {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .stars-quadrant > div:first-child span,
+  .stars-quadrant-map-container > div:first-child span {
+    overflow-wrap: anywhere;
+  }
+
   /* ── Galaxy map: smaller on mobile ── */
   .galaxy-map-deck { min-height: 300px; }
+
+  /* Keep the initial list empty state close to the header instead of viewport-centered */
+  .stars-quadrant.is-empty > .no-stars-overlay {
+    position: static;
+    transform: none;
+    text-align: left;
+    width: 100%;
+    padding: 18px 14px;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .stars-quadrant.is-empty > .no-stars-overlay .radar-ring {
+    font-size: 24px;
+  }
+
+  .stars-quadrant.is-empty > .no-stars-overlay p {
+    max-width: none;
+  }
+
+  .stars-quadrant-map-container.is-empty .matrix-quadrant-label {
+    display: none;
+  }
 
   /* ── Rich cards: stack chart panel below text ── */
   .rich-card {
     flex-direction: column !important;
     min-height: auto !important;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
-  .rich-card-left { border-right: none !important; border-bottom: 1px solid var(--border); }
+  .rich-card-left {
+    padding: 12px !important;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .rich-card-overview {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
   .rich-card-chart {
-    width: 100% !important;
-    flex-direction: row !important;
-    border-left: none !important;
-    border-top: 2px solid var(--focus-color, var(--gh-blue)) !important;
-    padding: 10px 14px !important;
-    gap: 12px !important;
-    flex-wrap: wrap;
+    display: none !important;
   }
 
   /* ── Filter pills: larger touch target ── */
