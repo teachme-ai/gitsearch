@@ -1423,12 +1423,20 @@ export default function App() {
           </div>
 
           {/* ── RADAR CONSOLE LOGS ── */}
-          <div className="hud-panel console-panel" style={{ marginTop: '12px', padding: '12px 14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span className="hud-panel-title" style={{ margin: 0, fontSize: '10px' }}>telemetry radar status</span>
+          <div className="console-panel" style={{ marginTop: '10px', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ 
+                fontSize: '9px', 
+                fontWeight: 700, 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.08em', 
+                color: 'var(--text-muted)' 
+              }}>
+                telemetry radar status
+              </span>
               {isScanning && (
                 <div className="scanner-active-ping" style={{
-                  width: '8px', height: '8px', borderRadius: '50%', background: 'var(--gh-blue)',
+                  width: '6px', height: '6px', borderRadius: '50%', background: 'var(--gh-blue)',
                   animation: 'pulse 1s infinite'
                 }} />
               )}
@@ -1439,15 +1447,15 @@ export default function App() {
                 background: '#0d1117',
                 border: '1px solid var(--border)',
                 borderRadius: '4px',
-                height: '110px',
+                height: '84px',
                 overflowY: 'auto',
-                padding: '8px 10px',
+                padding: '6px 8px',
                 fontFamily: 'var(--font-mono)',
                 fontSize: '10px',
-                lineHeight: '1.45',
+                lineHeight: '1.4',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '4px'
+                gap: '3px'
               }}
             >
               {consoleLogs.map((log, i) => (
