@@ -941,8 +941,19 @@ export default function App() {
         const starVelocity = item.stargazers_count / diffDays;
         const forkVelocity = item.forks_count / diffDays;
         const ageMonths = diffDays / 30;
+        
+        // Flattening Penalty: If a repo is older than 1 year (365 days) and has low recent commits (< 5),
+        // scale down its historical velocity scores. High-activity climbing repos maintain 100% scores.
+        let growthDecay = 1.0;
+        if (diffDays > 365 && commits < 5) {
+          growthDecay = 0.15 + (commits / 5) * 0.85;
+        }
+        
+        const starVelocityEffective = starVelocity * growthDecay;
+        const forkVelocityEffective = forkVelocity * growthDecay;
+        
         const freshnessBoost = ageMonths < 18 ? (1 - ageMonths / 18) * 0.15 : 0;
-        const telemetryScore = (5.0 * starVelocity) + (3.0 * forkVelocity) + (2.0 * commits) + (3.0 * resolution);
+        const telemetryScore = (6.0 * starVelocityEffective) + (2.0 * forkVelocityEffective) + (4.0 * commits) + (3.0 * resolution);
         const score = telemetryScore;
 
         const topics = item.topics || [];
