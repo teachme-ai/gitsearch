@@ -1391,7 +1391,7 @@ export default function App() {
               <input
                 type="text"
                 className="search-input-primary"
-                placeholder={searchMode === 'profile' ? "e.g. google, facebook, vercel, microsoft..." : "e.g. mlx, llama, diffusion, rust..."}
+                placeholder={searchMode === 'profile' ? "e.g. karpathy, torvalds, yyx990803, gaearon..." : "e.g. mlx, llama, diffusion, rust..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
