@@ -720,10 +720,7 @@ export default function App() {
         const compoundWord = words.join('');
         searchTermsClause = `(${expandedTerms}) OR "${compoundWord}"`;
       } else if (words.length === 1) {
-        const singleWord = words[0];
-        if (/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(singleWord)) {
-          searchTermsClause = `(${expandedTerms} OR user:${singleWord})`;
-        }
+        searchTermsClause = expandedTerms;
       }
     }
 
