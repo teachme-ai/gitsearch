@@ -722,7 +722,10 @@ export default function App() {
       }
     }
 
-    let finalQuery = `${searchTermsClause} stars:>${minStars}`;
+    let finalQuery = searchTermsClause;
+    if (minStars > 0) {
+      finalQuery += ` stars:>=${minStars}`;
+    }
     if (selectedLanguage !== 'All') {
       finalQuery += ` language:${selectedLanguage}`;
     }
