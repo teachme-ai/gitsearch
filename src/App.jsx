@@ -378,6 +378,7 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [hoveredProject, setHoveredProject] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
+  const [searchMode, setSearchMode] = useState('repository'); // 'repository' | 'profile'
   const [customToken, setCustomToken] = useState(() => {
     return localStorage.getItem('TELEMETRY_GITHUB_TOKEN') || localStorage.getItem('GALAXY_GITHUB_TOKEN') || '';
   });
@@ -704,21 +705,25 @@ export default function App() {
       return;
     }
 
-    // ── Query Expansion: enrich the raw query before hitting GitHub ──
-    const expandedTerms = expandQuery(targetQuery);
+    // ── Build Query based on Search Mode ──
+    let searchTermsClause = '';
     
-    // Generate compound word OR fallback (e.g. "open claw" OR "openclaw")
-    // If it's a single word, also expand to search for that username/profile ID
-    let searchTermsClause = expandedTerms;
-    const words = targetQuery.split(/\s+/);
-    if (words.length > 1) {
-      const compoundWord = words.join('');
-      searchTermsClause = `(${expandedTerms}) OR "${compoundWord}"`;
-    } else if (words.length === 1) {
-      const singleWord = words[0];
-      // GitHub username requirements: alphanumeric or single hyphens, max 39 chars, cannot start/end with hyphen
-      if (/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(singleWord)) {
-        searchTermsClause = `(${expandedTerms} OR user:${singleWord})`;
+    if (searchMode === 'profile') {
+      // Profile Search: query strictly by owner username
+      searchTermsClause = `user:${targetQuery}`;
+    } else {
+      // Repository Search: query by keywords with synonym expansions & coordination boosts
+      const expandedTerms = expandQuery(targetQuery);
+      searchTermsClause = expandedTerms;
+      const words = targetQuery.split(/\s+/);
+      if (words.length > 1) {
+        const compoundWord = words.join('');
+        searchTermsClause = `(${expandedTerms}) OR "${compoundWord}"`;
+      } else if (words.length === 1) {
+        const singleWord = words[0];
+        if (/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(singleWord)) {
+          searchTermsClause = `(${expandedTerms} OR user:${singleWord})`;
+        }
       }
     }
 
@@ -1335,11 +1340,58 @@ export default function App() {
               <span className="app-wordmark-title">🛰️ Git Observatory</span>
               <span className="app-wordmark-sub">Real-time repository search, semantic ranking &amp; health telemetry</span>
             </div>
+            <div className="search-mode-selector" style={{
+              display: 'flex',
+              gap: '14px',
+              margin: '8px 0 10px',
+              paddingTop: '6px',
+              borderTop: '1px solid var(--border)'
+            }}>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}>
+                <input
+                  type="radio"
+                  name="searchMode"
+                  value="repository"
+                  checked={searchMode === 'repository'}
+                  onChange={() => setSearchMode('repository')}
+                  style={{ accentColor: 'var(--gh-blue)', margin: 0 }}
+                />
+                Repository
+              </label>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}>
+                <input
+                  type="radio"
+                  name="searchMode"
+                  value="profile"
+                  checked={searchMode === 'profile'}
+                  onChange={() => setSearchMode('profile')}
+                  style={{ accentColor: 'var(--gh-blue)', margin: 0 }}
+                />
+                Profile ID
+              </label>
+            </div>
+
             <div className="search-row">
               <input
                 type="text"
                 className="search-input-primary"
-                placeholder="e.g. mlx, llama, diffusion, rust, kafka..."
+                placeholder={searchMode === 'profile' ? "e.g. wangdapang77, teachme-ai..." : "e.g. mlx, llama, diffusion, rust..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
