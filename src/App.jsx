@@ -524,7 +524,7 @@ const buildContributionCalendar = (repoKey = '', commits = 0) => {
 
 const UNIVERSAL_GATEKEEPER_WINDOW_MS = 60 * 1000;
 const UNIVERSAL_GATEKEEPER_LIMITS = {
-  free: 1,
+  free: 2,
   authenticated: 2,
 };
 const UNIVERSAL_GATEKEEPER_STORAGE_KEY = 'GIT_OBSERVATORY_GATEKEEPER_V1';
