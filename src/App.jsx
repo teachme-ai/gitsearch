@@ -754,31 +754,48 @@ export default function App() {
           const data = await res.json();
           const items = data.items || [];
           
-          const topicCounts = {};
-          const ignoredTopics = new Set([
-            'github', 'git', 'open-source', 'hacktoberfest', 'hacktoberfest2026', 'hacktoberfest-2026',
-            'python', 'javascript', 'typescript', 'rust', 'go', 'cpp', 'cplusplus', 'java', 'html', 'css',
-            'react', 'vue', 'angular', 'svelte', 'library', 'framework', 'tool', 'api', 'awesome', 'list',
-            'config', 'dotfiles', 'template', 'boilerplate', 'starter', 'meta', 'app', 'application',
-            'development', 'developer', 'software', 'programming', 'code', 'build', 'project', 'projects',
-            'learning', 'learn', 'education', 'tutorial', 'tutorials', 'course', 'courses', 'documentation',
-            'docs', 'guide', 'guides', 'examples', 'example', 'resources', 'resource', 'repo', 'repository'
-          ]);
-
-          const isSpamOrUnwanted = (t) => {
-            const unwanted = [
-              'crypto', 'bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'sol', 'nft', 'airdrop', 'claim',
-              'casino', 'gambling', 'betting', 'fake', 'stealer', 'grabber', 'exploit', 'bypass',
-              'crack', 'cheat', 'hack', 'telegram-bot', 'telegrambot', 'telegram', 'leak', 'giveaway', 'free'
-            ];
-            return unwanted.some(kw => t.includes(kw));
+          const SAFE_TOPICS_MAP = {
+            'ai-agents': '🤖 AI Agents',
+            'agents': '🤖 AI Agents',
+            'rag': '🧬 Vector Search',
+            'vector-database': '🧬 Vector DB',
+            'vector-search': '🧬 Vector Search',
+            'embeddings': '🧬 Embeddings',
+            'mlx': '🍏 MLX Framework',
+            'llmops': '📊 LLMOps',
+            'webgpu': '⚡ WebGPU',
+            'deepseek': '🐳 DeepSeek',
+            'langchain': '🦜 LangChain',
+            'llamaindex': '🗂️ LlamaIndex',
+            'ollama': '🦙 Ollama',
+            'transformers': '🧬 Transformers',
+            'vllm': '⚡ vLLM Engine',
+            'wasm': '🕸️ WebAssembly',
+            'webassembly': '🕸️ WebAssembly',
+            'nextjs': '🌐 Next.js',
+            'fastapi': '⚡ FastAPI',
+            'tailwind': '🎨 TailwindCSS',
+            'shadcn': '🎨 Shadcn UI',
+            'swiftui': '🍏 SwiftUI',
+            'pytorch': '🔥 PyTorch',
+            'tensorflow': '🍊 TensorFlow',
+            'cuda': '⚡ NVIDIA CUDA',
+            'llm': '🤖 LLM Core',
+            'generative-ai': '🤖 Generative AI',
+            'machine-learning': '📊 Machine Learning',
+            'deep-learning': '🧠 Deep Learning',
+            'computer-vision': '👁️ Computer Vision',
+            'nlp': '💬 NLP Core',
+            'fine-tuning': '🎯 Fine-Tuning',
+            'compiler': '⚙️ Compiler Engine'
           };
 
+          const topicCounts = {};
           items.forEach(item => {
             if (item.topics && Array.isArray(item.topics)) {
               item.topics.forEach(t => {
                 const cleanT = t.toLowerCase().trim();
-                if (cleanT.length > 2 && !ignoredTopics.has(cleanT) && !isSpamOrUnwanted(cleanT)) {
+                if (SAFE_TOPICS_MAP[cleanT]) {
                   topicCounts[cleanT] = (topicCounts[cleanT] || 0) + 1;
                 }
               });
@@ -789,20 +806,39 @@ export default function App() {
             .sort((a, b) => b[1] - a[1])
             .map(([topic]) => topic);
 
-          const emojis = ['🔥', '🤖', '⚡', '🧬', '🔭', '📦', '📡', '🛠️'];
-          
-          const suggestionsList = sortedTopics.slice(0, 8).map((topic, index) => {
-            const label = topic
-              .split('-')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ');
-              
+          let suggestionsList = sortedTopics.slice(0, 8).map((topic) => {
             return {
-              label: `${emojis[index % emojis.length]} ${label}`,
+              label: SAFE_TOPICS_MAP[topic],
               query: topic,
               mode: 'repository'
             };
           });
+
+          // Backfill from a curated safe developer set if we have fewer than 8 trending whitelisted topics
+          const fallbackList = [
+            'ai-agents',
+            'rag',
+            'llm',
+            'mlx',
+            'deepseek',
+            'llmops',
+            'embeddings',
+            'webgpu'
+          ];
+
+          if (suggestionsList.length < 8) {
+            const currentQueries = new Set(suggestionsList.map(s => s.query));
+            for (const topic of fallbackList) {
+              if (suggestionsList.length >= 8) break;
+              if (!currentQueries.has(topic)) {
+                suggestionsList.push({
+                  label: SAFE_TOPICS_MAP[topic],
+                  query: topic,
+                  mode: 'repository'
+                });
+              }
+            }
+          }
 
           if (suggestionsList.length > 0) {
             setTrendingTopics(suggestionsList);
