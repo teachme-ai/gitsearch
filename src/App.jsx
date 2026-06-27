@@ -6,6 +6,7 @@ import './App.css';
 // Zero runtime cost: pure lookup, no model download.
 const QUERY_EXPANSIONS = {
   // AI / LLM
+  'll':                ['llm', 'large-language-model', 'transformer'],
   'llm':               ['large-language-model', 'language-model', 'gpt', 'transformer'],
   'llms':              ['large-language-model', 'language-model', 'transformer'],
   'tts':               ['text-to-speech', 'speech-synthesis', 'voice-cloning'],
