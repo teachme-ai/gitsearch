@@ -1346,7 +1346,7 @@ export default function App() {
           
           {/* ── SEARCH — top of sidebar ── */}
           <div className="hud-panel search-primary-panel">
-            <div className="app-wordmark" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+            <div className="app-wordmark" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
               <img 
                 src="/social-share.png" 
                 alt="Logo" 
@@ -1366,9 +1366,7 @@ export default function App() {
             <div className="search-mode-selector" style={{
               display: 'flex',
               gap: '14px',
-              margin: '8px 0 10px',
-              paddingTop: '6px',
-              borderTop: '1px solid var(--border)'
+              margin: '10px 0 10px'
             }}>
               <label style={{
                 display: 'flex',
