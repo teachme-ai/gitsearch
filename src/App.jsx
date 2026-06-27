@@ -1309,32 +1309,6 @@ export default function App() {
           </a>
         </div>
       )}
-
-      {/* ════ TELEMETRY METRICS STRIP ════ */}
-      <header className="telemetry-hud">
-        <div className="hud-card">
-          <span className="hud-label">Observed Projects</span>
-          <span className="hud-value">{telemetry.total}</span>
-          <span className="hud-sub">Active Repositories</span>
-        </div>
-        <div className="hud-card">
-          <span className="hud-label">Avg Star Velocity</span>
-          <span className="hud-value">★ {telemetry.avgVelocity}</span>
-          <span className="hud-sub">Stars Gained / Day</span>
-        </div>
-        <div className="hud-card">
-          <span className="hud-label">Focus Distribution</span>
-          <span className="hud-value" style={{ fontSize: '1.1rem', marginTop: '6px' }}>
-            <span style={{ color: 'var(--neon-cyan)' }}>E: {telemetry.shares.enterprise}%</span>
-            {' · '}
-            <span style={{ color: 'var(--neon-emerald)' }}>I: {telemetry.shares.individual}%</span>
-            {' · '}
-            <span style={{ color: 'var(--neon-violet)' }}>C: {telemetry.shares.community}%</span>
-          </span>
-          <span className="hud-sub">Enterprise · Individual · Community</span>
-        </div>
-      </header>
-
       {/* ════ MAIN TELEMETRY INTERFACE ════ */}
       <div className="observatory-main">
         
@@ -1606,6 +1580,38 @@ export default function App() {
 
         {/* Right Side: Telemetry Matrix or Grid */}
         <main className={viewMode === 'map' ? 'stars-quadrant-map-container' : 'stars-quadrant'}>
+          
+          {/* Integrated Compact Telemetry Metrics Row */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'var(--bg-subtle)',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+            padding: '10px 16px',
+            marginBottom: '12px',
+            flexWrap: 'wrap',
+            gap: '12px',
+            width: '100%'
+          }}>
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Observed: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{telemetry.total}</strong>
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Avg Velocity: <strong style={{ color: 'var(--gh-blue)', fontFamily: 'var(--font-mono)' }}>★ {telemetry.avgVelocity}/day</strong>
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              Focus: <span style={{ color: 'var(--neon-cyan)', fontWeight: 600 }}>E: {telemetry.shares.enterprise}%</span>
+              {' · '}
+              <span style={{ color: 'var(--neon-emerald)', fontWeight: 600 }}>I: {telemetry.shares.individual}%</span>
+              {' · '}
+              <span style={{ color: 'var(--neon-violet)', fontWeight: 600 }}>C: {telemetry.shares.community}%</span>
+            </div>
+          </div>
+
           {viewMode === 'map' ? (
             <div className="galaxy-map-deck">
               {/* Telemetry Matrix Grid axes and crosshairs */}
