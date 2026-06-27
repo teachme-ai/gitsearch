@@ -6,63 +6,50 @@ import './App.css';
 // Zero runtime cost: pure lookup, no model download.
 const QUERY_EXPANSIONS = {
   // AI / LLM
-  'll':                ['llm', 'large-language-model', 'transformer'],
-  'llm':               ['large-language-model', 'language-model', 'gpt', 'transformer'],
-  'llms':              ['large-language-model', 'language-model', 'transformer'],
-  'tts':               ['text-to-speech', 'speech-synthesis', 'voice-cloning'],
-  'stt':               ['speech-to-text', 'asr', 'transcription'],
-  'asr':               ['speech-recognition', 'whisper', 'transcription'],
-  'nlp':               ['natural-language-processing', 'text-analysis', 'language'],
-  'cv':                ['computer-vision', 'image-recognition', 'vision'],
-  'rl':                ['reinforcement-learning', 'reward', 'agent'],
-  'ml':                ['machine-learning', 'training', 'model'],
+  'll':                ['llm', 'large-language-model'],
+  'llm':               ['large-language-model', 'transformer'],
+  'llms':              ['large-language-model', 'transformer'],
+  'tts':               ['text-to-speech', 'voice-cloning'],
+  'stt':               ['speech-to-text', 'whisper'],
+  'asr':               ['speech-recognition', 'whisper'],
+  'nlp':               ['natural-language-processing', 'text-analysis'],
+  'cv':                ['computer-vision', 'image-recognition'],
+  'rl':                ['reinforcement-learning', 'agent'],
+  'ml':                ['machine-learning', 'training'],
   'dl':                ['deep-learning', 'neural-network'],
-  'gan':               ['generative-adversarial-network', 'image-generation', 'generative'],
-  'vae':               ['variational-autoencoder', 'generative', 'latent'],
-  'rag':               [
-    'retrieval-augmented-generation',
-    'semantic-search',
-    'vector-search',
-    'vector-database',
-    'vector-store',
-    'embedding',
-    'embeddings',
-    'knowledge-base',
-    'question-answering',
-    'langchain',
-    'llamaindex',
-    'haystack'
-  ],
-  'vllm':              ['vision-language-model', 'multimodal', 'vlm'],
+  'gan':               ['generative-adversarial-network', 'generative'],
+  'vae':               ['variational-autoencoder', 'generative'],
+  'rag':               ['retrieval-augmented-generation', 'vector-search', 'llamaindex'],
+  'vllm':              ['vision-language-model', 'vlm'],
   'vlm':               ['vision-language-model', 'multimodal'],
-  'lora':              ['fine-tuning', 'low-rank-adaptation', 'peft'],
-  'peft':              ['parameter-efficient', 'fine-tuning', 'lora'],
-  'rlhf':              ['reinforcement-learning-human-feedback', 'alignment', 'fine-tuning'],
-  'sam':               ['segment-anything', 'image-segmentation', 'meta'],
-  'clip':              ['contrastive-learning', 'image-text', 'openai'],
-  'bert':              ['bert', 'transformer', 'nlp', 'language-model'],
-  'gpt':               ['gpt', 'openai', 'language-model', 'transformer'],
-  'llama':             ['llama', 'meta-llama', 'llm', 'local-llm'],
-  'mistral':           ['mistral', 'llm', 'local-llm'],
-  'diffusion':         ['diffusion-model', 'image-generation', 'stable-diffusion'],
-  'stable-diffusion':  ['stable-diffusion', 'image-generation', 'diffusion-model'],
-  'ollama':            ['ollama', 'local-llm', 'inference'],
-  'mlx':               ['mlx', 'apple-silicon', 'local-inference'],
-  'vector':            ['vector-database', 'embedding', 'similarity-search'],
-  'embeddings':        ['vector-embedding', 'semantic-search', 'dense-retrieval'],
+  'lora':              ['fine-tuning', 'low-rank-adaptation'],
+  'peft':              ['parameter-efficient', 'fine-tuning'],
+  'rlhf':              ['reinforcement-learning-human-feedback', 'alignment'],
+  'sam':               ['segment-anything', 'image-segmentation'],
+  'clip':              ['contrastive-learning', 'openai'],
+  'bert':              ['bert', 'transformer'],
+  'gpt':               ['gpt', 'openai'],
+  'llama':             ['llama', 'local-llm'],
+  'mistral':           ['mistral', 'local-llm'],
+  'diffusion':         ['diffusion-model', 'stable-diffusion'],
+  'stable-diffusion':  ['stable-diffusion', 'image-generation'],
+  'ollama':            ['ollama', 'local-llm'],
+  'mlx':               ['mlx', 'local-inference'],
+  'vector':            ['vector-database', 'embeddings'],
+  'embeddings':        ['vector-embedding', 'semantic-search'],
   // Infrastructure
-  'k8s':               ['kubernetes', 'container', 'orchestration'],
-  'ci':                ['continuous-integration', 'pipeline', 'devops'],
-  'cd':                ['continuous-deployment', 'devops', 'gitops'],
-  'iac':               ['infrastructure-as-code', 'terraform', 'pulumi'],
-  'observability':     ['monitoring', 'tracing', 'metrics', 'logging'],
-  'mlops':             ['mlops', 'ml-pipeline', 'model-deployment'],
-  'llmops':            ['llmops', 'llm-deployment', 'model-serving'],
+  'k8s':               ['kubernetes', 'container'],
+  'ci':                ['continuous-integration', 'pipeline'],
+  'cd':                ['continuous-deployment', 'devops'],
+  'iac':               ['infrastructure-as-code', 'terraform'],
+  'observability':     ['monitoring', 'tracing'],
+  'mlops':             ['mlops', 'ml-pipeline'],
+  'llmops':            ['llmops', 'llm-deployment'],
   // Data
-  'etl':               ['data-pipeline', 'data-engineering', 'ingestion'],
-  'olap':              ['analytics', 'data-warehouse', 'columnar'],
-  'kafka':             ['kafka', 'event-streaming', 'message-queue'],
-  'spark':             ['apache-spark', 'data-processing', 'distributed'],
+  'etl':               ['data-pipeline', 'data-engineering'],
+  'olap':              ['analytics', 'data-warehouse'],
+  'kafka':             ['kafka', 'event-streaming'],
+  'spark':             ['apache-spark', 'data-processing'],
   // Languages (keep short to avoid false positives)
   'rs':                ['rust'],
   'golang':            ['go', 'golang'],
@@ -740,6 +727,23 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
+  const [hasSearched, setHasSearched] = useState(false);
+  
+  const suggestions = [
+    { label: "💡 How LLMs work", query: "I want to learn how LLM's work.", mode: 'natural' },
+    { label: "⚡ KV Cache", query: "about KV Cache", mode: 'natural' },
+    { label: "🐰 Bun Framework", query: "I wanna understand how to use bun.", mode: 'natural' },
+    { label: "🔭 Observability", query: "How can I learn more about AI observability?", mode: 'natural' },
+    { label: "🍏 MLX Framework", query: "mlx", mode: 'repository' },
+    { label: "📦 PyTorch", query: "pytorch", mode: 'repository' },
+  ];
+
+  const handleSuggestionClick = (query, mode) => {
+    setSearchMode(mode);
+    setSearchQuery(query);
+    performGitHubSearch(query);
+  };
+
   const consoleRef = useRef(null);
 
   // Auto-scroll console logs
@@ -1041,11 +1045,11 @@ export default function App() {
     }
   };
 
-  // Trigger Real-Time GitHub API Live Search & Telemetry Analysis
   const performGitHubSearch = async (overrideQuery = null) => {
     if (isScanning) return;
+    setHasSearched(true);
+    setSidebarOpen(false);
     if (isMobile) {
-      setSidebarOpen(false);
       setViewMode('grid');
     }
     setIsScanning(true);
@@ -2175,35 +2179,37 @@ export default function App() {
         <main className={`${activeViewMode === 'map' ? 'stars-quadrant-map-container' : 'stars-quadrant'} ${filteredProjects.length === 0 ? 'is-empty' : ''}`}>
           
           {/* Integrated Compact Telemetry Metrics Row */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            background: 'var(--bg-subtle)',
-            border: '1px solid var(--border)',
-            borderRadius: '6px',
-            padding: '10px 16px',
-            marginBottom: '12px',
-            flexWrap: 'wrap',
-            gap: '12px',
-            width: '100%'
-          }}>
-            <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', width: '100%', minWidth: 0 }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                Observed: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{telemetry.total}</strong>
-              </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                Avg Velocity: <strong style={{ color: 'var(--gh-blue)', fontFamily: 'var(--font-mono)' }}>★ {telemetry.avgVelocity}/day</strong>
-              </span>
+          {projects.length > 0 && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border)',
+              borderRadius: '6px',
+              padding: '10px 16px',
+              marginBottom: '12px',
+              flexWrap: 'wrap',
+              gap: '12px',
+              width: '100%'
+            }}>
+              <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap', width: '100%', minWidth: 0 }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Observed: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{telemetry.total}</strong>
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Avg Velocity: <strong style={{ color: 'var(--gh-blue)', fontFamily: 'var(--font-mono)' }}>★ {telemetry.avgVelocity}/day</strong>
+                </span>
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '100%', minWidth: 0 }}>
+                Focus: <span style={{ color: 'var(--neon-cyan)', fontWeight: 600 }}>E: {telemetry.shares.enterprise}%</span>
+                {' · '}
+                <span style={{ color: 'var(--neon-emerald)', fontWeight: 600 }}>I: {telemetry.shares.individual}%</span>
+                {' · '}
+                <span style={{ color: 'var(--neon-violet)', fontWeight: 600 }}>C: {telemetry.shares.community}%</span>
+              </div>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', width: '100%', minWidth: 0 }}>
-              Focus: <span style={{ color: 'var(--neon-cyan)', fontWeight: 600 }}>E: {telemetry.shares.enterprise}%</span>
-              {' · '}
-              <span style={{ color: 'var(--neon-emerald)', fontWeight: 600 }}>I: {telemetry.shares.individual}%</span>
-              {' · '}
-              <span style={{ color: 'var(--neon-violet)', fontWeight: 600 }}>C: {telemetry.shares.community}%</span>
-            </div>
-          </div>
+          )}
 
           {/* ── Mobile filter launcher ── */}
           {isMobile && !sidebarOpen && !selectedProjectDetails && (
@@ -2217,7 +2223,25 @@ export default function App() {
             </button>
           )}
 
-          {activeViewMode === 'map' ? (
+          {projects.length === 0 && !isScanning && !hasSearched ? (
+            <div className="launchpad-container">
+              <h3 className="launchpad-title">
+                Suggested Observatory Scans
+              </h3>
+              <div className="launchpad-grid">
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSuggestionClick(s.query, s.mode)}
+                    className="launchpad-card"
+                  >
+                    <span className="launchpad-card-label">{s.label}</span>
+                    <span className="launchpad-card-query">"{s.query}"</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : activeViewMode === 'map' ? (
             <div className="galaxy-map-deck">
               {/* Telemetry Matrix Grid axes and crosshairs */}
               <div className="matrix-crosshair-h" />
