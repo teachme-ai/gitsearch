@@ -2740,73 +2740,19 @@ export default function App() {
           {projects.length === 0 && !isScanning && !hasSearched ? (
             <div className="launchpad-container">
               <h3 className="launchpad-title">
-                Credibility Test Bench
+                Suggested Observatory Scans
               </h3>
               <p className="launchpad-subtitle">
-                Pressure-test GitObs with scenarios that check source-repo lineage, adoption, upkeep, and hype control.
+                Select a trending topic below to trigger an instant real-time telemetry scan.
               </p>
               <div className="launchpad-grid">
-                {[
-                  {
-                    label: 'Foundational source repo',
-                    query: 'framework sdk starter template plugin adapter',
-                    mode: 'repository',
-                    proof: 'Checks whether GitObs can surface the base repository that downstream projects copy from.'
-                  },
-                  {
-                    label: 'RAG stack reality check',
-                    query: 'rag vector search embeddings langchain llamaindex haystack',
-                    mode: 'repository',
-                    proof: 'Checks whether GitObs separates working retrieval stacks from buzzword wrappers.'
-                  },
-                  {
-                    label: 'Enterprise readiness',
-                    query: 'llmops mlops observability security governance deployment',
-                    mode: 'repository',
-                    proof: 'Checks whether GitObs prioritizes maintained tools with production evidence.'
-                  },
-                  {
-                    label: 'Community gravity',
-                    query: 'awesome roadmap handbook tutorial curriculum',
-                    mode: 'repository',
-                    proof: 'Checks whether GitObs distinguishes broad community hubs from shallow copies.'
-                  },
-                  {
-                    label: 'Hype vs upkeep',
-                    query: 'vector search',
-                    mode: 'repository',
-                    proof: 'Checks whether GitObs notices star traction that outruns maintenance.'
-                  },
-                  {
-                    label: 'Lineage and reuse map',
-                    query: 'boilerplate starter clone plugin adapter',
-                    mode: 'repository',
-                    proof: 'Checks whether GitObs can detect derivative ecosystems and source repositories.'
-                  }
-                ].map((s, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSuggestionClick(s.query, s.mode)}
-                    className="launchpad-card"
-                  >
-                    <span className="launchpad-card-label">{s.label}</span>
-                    <span className="launchpad-card-proof">{s.proof}</span>
-                    <span className="launchpad-card-query">"{s.query}"</span>
-                  </button>
-                ))}
-              </div>
-              <h3 className="launchpad-title" style={{ marginTop: '4px' }}>
-                Live Discovery Seeds
-              </h3>
-              <div className="launchpad-grid">
-                {suggestions.slice(0, 4).map((s, idx) => (
+                {suggestions.slice(0, 8).map((s, idx) => (
                   <button
                     key={`seed-${idx}`}
                     onClick={() => handleSuggestionClick(s.query, s.mode)}
                     className="launchpad-card"
                   >
                     <span className="launchpad-card-label">{s.label}</span>
-                    {s.proof && <span className="launchpad-card-proof">{s.proof}</span>}
                     <span className="launchpad-card-query">"{s.query}"</span>
                   </button>
                 ))}
