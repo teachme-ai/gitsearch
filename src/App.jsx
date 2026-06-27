@@ -1145,7 +1145,7 @@ export default function App() {
               maxWidth: '850px',
               fontWeight: 500
             }}>
-              Search and evaluate GitHub repositories instantly. Compare star growth speed, recent commit activity, issue resolution rates, and read AI-powered code health summaries to choose the right library for your project.
+              Find interesting and relevant GitHub repositories for whatever you are searching for. Scan any topic to instantly filter, rank, and explore codebases by their growth velocity, activity levels, and AI-powered code summaries.
             </p>
           </div>
           {showGuide && (
