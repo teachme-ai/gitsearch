@@ -1768,14 +1768,29 @@ export default function App() {
 
                       {/* Star velocity sparkline */}
                       {(() => {
-                        const vel = project.starVelocity || 1;
+                        const vel = project.starVelocity || 0;
+                        const stars = project.stars || 0;
+                        const commits = project.commits || 0;
                         const pts = 14;
                         const vals = Array.from({ length: pts }, (_, i) => {
                           const t = i / (pts - 1);
-                          const curve = Math.pow(t, 1 / Math.max(0.4, Math.min(2.2, vel * 0.28 + 0.6)));
-                          // Add subtle organic noise
-                          const noise = (Math.sin(i * 2.3 + vel) * 0.04);
-                          return Math.max(0, Math.min(1, curve + noise)) * 100;
+                          if (stars === 0) {
+                            return 0; // Flat line at the bottom for 0 stars
+                          }
+                          
+                          let base;
+                          if (vel > 2.0) {
+                            // Exponential climb for high-growth repos
+                            base = 0.2 + 0.8 * Math.pow(t, 1 / Math.max(0.4, vel * 0.2 + 0.6));
+                          } else {
+                            // Flat-ish/stable line for existing repos with low velocity
+                            base = 0.65 + (t * 0.15) - 0.05;
+                          }
+                          
+                          // Organic fluctuations relative to commit activity
+                          const activityFactor = Math.min(15, commits) / 15;
+                          const noise = Math.sin(i * 1.8 + stars) * 0.04 * activityFactor;
+                          return Math.max(5, Math.min(95, (base + noise) * 100));
                         });
                         const W = 130, H = 52;
                         const toX = (i) => (i / (pts - 1)) * W;
