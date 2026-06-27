@@ -1710,7 +1710,7 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <img 
-                  src="/social-share.png" 
+                  src="/logo.jpg" 
                   alt="Git Observatory Logo" 
                   style={{
                     width: '42px',
@@ -1934,7 +1934,7 @@ export default function App() {
           <div className="hud-panel search-primary-panel">
             <div className="app-wordmark" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
               <img 
-                src="/social-share.png" 
+                src="/logo.jpg" 
                 alt="Logo" 
                 style={{
                   width: '32px',
