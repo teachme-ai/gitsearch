@@ -19,7 +19,20 @@ const QUERY_EXPANSIONS = {
   'dl':                ['deep-learning', 'neural-network'],
   'gan':               ['generative-adversarial-network', 'image-generation', 'generative'],
   'vae':               ['variational-autoencoder', 'generative', 'latent'],
-  'rag':               ['retrieval-augmented-generation', 'vector-search', 'embedding'],
+  'rag':               [
+    'retrieval-augmented-generation',
+    'semantic-search',
+    'vector-search',
+    'vector-database',
+    'vector-store',
+    'embedding',
+    'embeddings',
+    'knowledge-base',
+    'question-answering',
+    'langchain',
+    'llamaindex',
+    'haystack'
+  ],
   'vllm':              ['vision-language-model', 'multimodal', 'vlm'],
   'vlm':               ['vision-language-model', 'multimodal'],
   'lora':              ['fine-tuning', 'low-rank-adaptation', 'peft'],
@@ -80,6 +93,34 @@ function expandQuery(rawQuery) {
     }
   }
   return clauses.join(' ');
+}
+
+function buildBroadenedQuery(rawQuery) {
+  const terms = rawQuery.toLowerCase().trim().split(/\s+/);
+  const broadenedTerms = new Set();
+
+  for (const term of terms) {
+    if (term === 'rag') {
+      [
+        'retrieval augmented generation',
+        'semantic search',
+        'vector database',
+        'vector store',
+        'embeddings',
+        'knowledge base',
+        'question answering',
+        'langchain',
+        'llamaindex',
+        'haystack'
+      ].forEach(item => broadenedTerms.add(item));
+    }
+  }
+
+  if (broadenedTerms.size === 0) return null;
+
+  return Array.from(broadenedTerms)
+    .map(term => (term.includes(' ') ? `"${term}"` : term))
+    .join(' OR ');
 }
 
 // ─── BM25+ ENGINE — upgraded from bm25s (xhluca/bm25s) ───────────────────────
@@ -366,6 +407,300 @@ const getSectorFilter = (sector, project) => {
   }
 };
 
+const compactNumber = (value) => {
+  const numeric = Number(value) || 0;
+  if (numeric >= 1000000) return `${(numeric / 1000000).toFixed(1)}m`;
+  if (numeric >= 1000) return `${(numeric / 1000).toFixed(1)}k`;
+  return `${numeric}`;
+};
+
+const getRepoShortName = (repo = '') => repo.split('/')[1] || repo || 'this repository';
+
+const getRepositoryQuadrant = (project) => {
+  const velocity = Number(project.starVelocityEffective ?? project.starVelocity) || 0;
+  const commits = Number(project.commits) || 0;
+  const resolution = Number(project.resolution) || 0;
+  const ownerFollowers = Number(project.ownerFollowers) || 0;
+  const stars = Number(project.stars) || 0;
+  const credibility = (commits * 0.6) + (resolution * 18) + Math.min(ownerFollowers / 600, 6);
+  const hasMomentum = velocity >= 2.5;
+  const hasStrongMomentum = velocity >= 6;
+  const hasCredibility = credibility >= 9 || (commits >= 8 && resolution >= 0.55);
+  const hasStrongCredibility = credibility >= 13 || (commits >= 15 && resolution >= 0.65);
+  const isEstablished = stars >= 5000 || ownerFollowers >= 2000;
+
+  if ((hasStrongMomentum && hasCredibility) || (hasMomentum && hasStrongCredibility)) {
+    return {
+      label: 'Strategic Leader',
+      tone: 'leader',
+      summary: 'Strong adoption signal with enough operational evidence to justify serious evaluation.'
+    };
+  }
+  if ((!hasMomentum && hasCredibility) || (isEstablished && commits >= 3)) {
+    return {
+      label: 'Trusted Specialist',
+      tone: 'specialist',
+      summary: 'Credible and maintained, but with steadier or more niche adoption momentum.'
+    };
+  }
+  if (hasMomentum && !hasCredibility) {
+    return {
+      label: 'Rising Challenger',
+      tone: 'challenger',
+      summary: 'Visible and fast-moving, but worth validating before production adoption.'
+    };
+  }
+  return {
+    label: 'Early / Unproven',
+    tone: 'early',
+    summary: 'Useful to inspect or monitor, but not yet backed by strong adoption or maintenance evidence.'
+  };
+};
+
+const PERSONA_PROFILES = {
+  explorer: {
+    label: 'Generic Explorer',
+    audience: 'developers exploring a topic before narrowing the evaluation lens',
+    priority: 'balanced relevance, adoption, momentum, and maintenance signals',
+    weights: { relevance: 0.24, adoption: 0.22, operations: 0.22, momentum: 0.20, ecosystem: 0.12 }
+  },
+  ai_builder: {
+    label: 'AI Builder',
+    audience: 'AI builders and indie technical founders',
+    priority: 'momentum, practical implementation value, and emerging-tool signal',
+    weights: { momentum: 0.34, relevance: 0.24, operations: 0.16, adoption: 0.16, ecosystem: 0.10 }
+  },
+  integration_engineer: {
+    label: 'Integration Engineer',
+    audience: 'integration engineers and solution architects',
+    priority: 'maintenance health, adoption proof, and operational readiness',
+    weights: { operations: 0.34, adoption: 0.24, ecosystem: 0.18, relevance: 0.16, momentum: 0.08 }
+  },
+  platform_engineer: {
+    label: 'Platform Engineer',
+    audience: 'platform engineers and developer tooling teams',
+    priority: 'ecosystem credibility, maintainability, and reusable architecture',
+    weights: { ecosystem: 0.30, operations: 0.26, adoption: 0.20, relevance: 0.14, momentum: 0.10 }
+  },
+  research_scout: {
+    label: 'Research Scout',
+    audience: 'scouts, learners, and ecosystem researchers',
+    priority: 'novelty, momentum, and category exploration value',
+    weights: { novelty: 0.30, momentum: 0.26, relevance: 0.22, adoption: 0.12, operations: 0.10 }
+  }
+};
+
+const THEME_PRESETS = [
+  {
+    label: 'Agents',
+    query: 'ai agents autonomous tools',
+    description: 'Autonomous workflow orchestration, tool use, and agent infrastructure.',
+  },
+  {
+    label: 'RAG and knowledge systems',
+    query: 'retrieval augmented generation semantic search vector database embeddings knowledge base question answering',
+    description: 'Retrieval, retrieval pipelines, and knowledge grounding systems.',
+  },
+  {
+    label: 'AI coding',
+    query: 'ai coding copilot code generation',
+    description: 'Developer tools that accelerate coding and code understanding.',
+  },
+  {
+    label: 'DevOps / Infrastructure',
+    query: 'devops infrastructure deployment observability',
+    description: 'Operational tooling, deployment surfaces, and platform building blocks.',
+  },
+  {
+    label: 'Data Engineering',
+    query: 'data pipeline etl streaming analytics',
+    description: 'Pipelines, data movement, orchestration, and analytical systems.',
+  },
+  {
+    label: 'Library / Framework',
+    query: 'library framework sdk starter',
+    description: 'Reusable foundations that become the base for other repositories.',
+  }
+];
+
+const getLineageSignals = (project) => {
+  const stars = Number(project.stars) || 0;
+  const forks = Number(project.forks) || 0;
+  const contributors = Array.isArray(project.contributors) ? project.contributors.length : 0;
+  const followers = Number(project.ownerFollowers) || 0;
+  const velocity = Number(project.starVelocityEffective ?? project.starVelocity) || 0;
+  const ageMonths = Number(project.ageMonths) || 12;
+  const description = `${project.description || ''} ${(project.topics || []).join(' ')}`.toLowerCase();
+
+  const lineageKeywords = [
+    'framework', 'sdk', 'starter', 'template', 'boilerplate', 'library',
+    'reference', 'example', 'blueprint', 'clone', 'plugin', 'adapter'
+  ];
+  const lineageKeywordHits = lineageKeywords.reduce((count, keyword) => (
+    description.includes(keyword) ? count + 1 : count
+  ), 0);
+
+  const baseScore = Math.min(
+    100,
+    Math.round(
+      (Math.log10(stars + 1) * 18) +
+      (Math.log10(forks + 1) * 24) +
+      (contributors * 4.5) +
+      (Math.min(followers / 250, 12)) +
+      (Math.min(velocity * 2.2, 16)) +
+      (ageMonths > 18 ? 6 : 0)
+    )
+  );
+
+  const influenceScore = Math.min(100, baseScore + Math.min(lineageKeywordHits * 6, 18));
+
+  let label = 'Specialized Source';
+  if (influenceScore >= 82) label = 'Foundational Base';
+  else if (influenceScore >= 62) label = 'Broadly Reused';
+  else if (influenceScore >= 40) label = 'Emerging Source';
+
+  const summary = lineageKeywordHits >= 3
+    ? 'Strong source-repo signal: looks like a base for derivative tooling and downstream implementations.'
+    : lineageKeywordHits > 0
+      ? 'Some lineage cues detected, with enough ecosystem gravity to matter.'
+      : 'Influence is mostly driven by adoption and forks rather than explicit base-repo cues.';
+
+  return {
+    score: influenceScore,
+    label,
+    summary,
+    lineageKeywordHits,
+  };
+};
+
+const getPersonaFit = (project, personaId = 'explorer') => {
+  const persona = PERSONA_PROFILES[personaId] || PERSONA_PROFILES.explorer;
+  const velocity = Number(project.starVelocityEffective ?? project.starVelocity) || 0;
+  const commits = Number(project.commits) || 0;
+  const resolution = Number(project.resolution) || 0;
+  const stars = Number(project.stars) || 0;
+  const forks = Number(project.forks) || 0;
+  const ownerFollowers = Number(project.ownerFollowers) || 0;
+  const relevance = Number(project.bm25Score) || 0;
+
+  const signals = {
+    adoption: Math.min(100, Math.round((Math.log10(stars + 1) / 5) * 100)),
+    momentum: Math.min(100, Math.round((velocity / 8) * 100)),
+    operations: Math.min(100, Math.round((commits / 20) * 65 + resolution * 35)),
+    relevance: relevance > 0 ? Math.round(relevance * 100) : Math.min(100, Math.round((project.score || 0) / 3)),
+    ecosystem: Math.min(100, Math.round((Math.log10(forks + 1) / 4) * 64 + Math.min(ownerFollowers / 5000, 1) * 36)),
+  };
+  signals.novelty = Math.max(0, Math.min(100, Math.round(70 + signals.momentum * 0.35 - signals.adoption * 0.45)));
+
+  const fit = Object.entries(persona.weights).reduce((total, [signal, weight]) => {
+    return total + (signals[signal] || 0) * weight;
+  }, 0);
+
+  return {
+    label: persona.label,
+    audience: persona.audience,
+    priority: persona.priority,
+    score: Math.round(fit),
+    signals
+  };
+};
+
+const buildRepositoryCard = (project, personaId = 'explorer') => {
+  const repoName = getRepoShortName(project.repo);
+  const theme = project.theme || 'General Engineering';
+  const primaryLanguage = project.primaryLanguage || project.languageNames?.[0]?.name || 'multi-language';
+  const velocity = Number(project.starVelocityEffective ?? project.starVelocity) || 0;
+  const commits = Number(project.commits) || 0;
+  const resolution = Number(project.resolution) || 0;
+  const stars = Number(project.stars) || 0;
+  const forks = Number(project.forks) || 0;
+  const relevance = Number(project.bm25Score) || 0;
+  const quadrant = getRepositoryQuadrant(project);
+  const personaFit = getPersonaFit(project, personaId);
+  const lineage = getLineageSignals(project);
+
+  const momentumLabel = velocity >= 8
+    ? 'fast-rising'
+    : velocity >= 2.5
+      ? 'gaining traction'
+      : stars >= 10000
+        ? 'widely adopted'
+        : 'steady';
+
+  const maintenanceLabel = commits >= 12
+    ? 'active maintenance'
+    : commits >= 4
+      ? 'regular updates'
+      : 'limited recent activity';
+
+  const relevanceLabel = relevance >= 0.65
+    ? 'high query fit'
+    : relevance >= 0.35
+      ? 'moderate query fit'
+      : 'broad category fit';
+
+  let why = `${repoName} is a ${momentumLabel} ${theme.toLowerCase()} candidate with ${compactNumber(stars)} stars, ${compactNumber(forks)} forks, and ${maintenanceLabel}.`;
+  if (project.description) {
+    why = `${repoName} stands out as a ${momentumLabel} ${theme.toLowerCase()} repository: ${project.description}`;
+  }
+  if (lineage.score >= 82) {
+    why = `${repoName} looks like a foundational source repo for the ${theme.toLowerCase()} ecosystem: ${project.description || 'it carries strong downstream reuse signals.'}`;
+  }
+
+  const bestFor = `Best for ${personaFit.audience} prioritizing ${personaFit.priority}.`;
+
+  let watchOut = 'Validate documentation depth and integration fit before committing.';
+  if (velocity > 8 && commits < 4) {
+    watchOut = 'High attention but low recent commit activity; verify maintainer capacity before relying on it.';
+  } else if (commits === 0) {
+    watchOut = 'No recent commits detected in the scan window; check whether the project is dormant.';
+  } else if (resolution < 0.45) {
+    watchOut = 'Issue resolution signal is weak; inspect open issues before adoption.';
+  } else if (stars < 500 && forks < 100) {
+    watchOut = 'Smaller adoption base; useful for exploration, but validate community proof.';
+  }
+
+  const maturity = quadrant.label === 'Strategic Leader'
+    ? 'Strong candidate for serious evaluation.'
+    : quadrant.label === 'Trusted Specialist'
+      ? 'Credible specialist with measured adoption.'
+      : quadrant.label === 'Rising Challenger'
+        ? 'Promising candidate to monitor and test.'
+        : 'Early signal; inspect carefully before adoption.';
+
+  return {
+    why_it_matters: why,
+    best_for: bestFor,
+    watch_out: watchOut,
+    persona_label: personaFit.label,
+    persona_priority: personaFit.priority,
+    persona_fit: personaFit.score,
+    lineage_score: lineage.score,
+    lineage_label: lineage.label,
+    lineage_summary: lineage.summary,
+    maturity_summary: maturity,
+    adoption_summary: `${compactNumber(stars)} stars, ${compactNumber(forks)} forks, ${Number(velocity).toFixed(1)} effective stars/day.`,
+    operational_summary: `${commits} commits in 14 days, ${Math.round(resolution * 100)}% issue resolution signal.`,
+    integration_readiness: commits >= 8 && resolution >= 0.6 ? 'Ready for evaluation' : commits >= 3 ? 'Needs validation' : 'Monitor first',
+    relevance_summary: relevance > 0 ? relevanceLabel : 'Telemetry-ranked result',
+    quadrant_label: quadrant.label,
+    quadrant_tone: quadrant.tone,
+    quadrant_summary: quadrant.summary,
+    trust_signals: [
+      `${compactNumber(stars)} stars`,
+      `${compactNumber(forks)} forks`,
+      `${commits} recent commits`,
+      primaryLanguage
+    ],
+    scorecard: {
+      adoption: personaFit.signals.adoption,
+      operations: personaFit.signals.operations,
+      fit: personaFit.score,
+      influence: lineage.score,
+    }
+  };
+};
+
 export default function App() {
   const [projects, setProjects] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -375,6 +710,7 @@ export default function App() {
   const [selectedFocus, setSelectedFocus] = useState('All');
   const [selectedQuadrant, setSelectedQuadrant] = useState('All');
   const [selectedLanguages, setSelectedLanguages] = useState([]);
+  const [selectedPersona, setSelectedPersona] = useState('explorer');
   const [selectedProject, setSelectedProject] = useState(null);
   const [hoveredProject, setHoveredProject] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
@@ -527,7 +863,6 @@ export default function App() {
   const calculateTelemetryTier = (project) => {
     const velocity = project.starVelocity || 0;
     const commits = project.commits || 0;
-    const resolution = project.resolution || 0.75;
     
     // Feature 3: Viral Surge / Under-maintained detection
     if (velocity > 10 && commits < 2) {
@@ -574,13 +909,15 @@ export default function App() {
       const matchesLanguage = selectedLanguages.length === 0 || 
         (project.primaryLanguage && selectedLanguages.some(lang => lang.toLowerCase() === project.primaryLanguage.toLowerCase()));
       return matchesFocus && matchesSector && matchesLanguage;
+    }).sort((a, b) => {
+      return getPersonaFit(b, selectedPersona).score - getPersonaFit(a, selectedPersona).score;
     });
-  }, [projects, selectedFocus, selectedQuadrant, selectedLanguages]);
+  }, [projects, selectedFocus, selectedQuadrant, selectedLanguages, selectedPersona]);
 
   // Reset to page 1 whenever filters or results change
   useEffect(() => {
     setCurrentPage(1);
-  }, [projects, selectedFocus, selectedQuadrant, selectedLanguages]);
+  }, [projects, selectedFocus, selectedQuadrant, selectedLanguages, selectedPersona]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE));
   const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -792,26 +1129,46 @@ export default function App() {
     log('info', `Search: "${finalQuery}"`);
 
     const isProd = import.meta.env.PROD && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    const searchUrl = isProd
-      ? `/api/search?q=${encodeURIComponent(finalQuery)}`
-      : `https://api.github.com/search/repositories?q=${encodeURIComponent(finalQuery)}&sort=stars&order=desc&per_page=30`;
-    log('info', isProd ? '🛰️ Querying GitDeck Secure API Proxy...' : '🛰️ Querying GitHub Search API...');
     setHasRateLimitError(false);
 
-    try {
+    const fetchSearchItems = async (query, label) => {
+      const searchUrl = isProd
+        ? `/api/search?q=${encodeURIComponent(query)}`
+        : `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=30`;
+      log('info', label || (isProd ? '🛰️ Querying GitDeck Secure API Proxy...' : '🛰️ Querying GitHub Search API...'));
       const response = await fetch(searchUrl, { headers });
       if (!response.ok) {
         if (response.status === 403 || response.status === 429) {
           log('warn', '⚠️ Sector blocked: GitHub Search API rate limit reached.');
           setHasRateLimitError(true);
-          setIsScanning(false);
-          return;
+          return null;
         }
         throw new Error(`API status ${response.status}`);
       }
 
       const data = await response.json();
-      const items = data.items || [];
+      return data.items || [];
+    };
+
+    const mergeUniqueItems = (lists) => {
+      const seen = new Set();
+      const merged = [];
+      for (const list of lists) {
+        for (const item of list || []) {
+          if (!item?.full_name || seen.has(item.full_name)) continue;
+          seen.add(item.full_name);
+          merged.push(item);
+        }
+      }
+      return merged;
+    };
+
+    try {
+      const items = await fetchSearchItems(finalQuery);
+      if (items === null) {
+        setIsScanning(false);
+        return;
+      }
       log('success', `✓ Discovered ${items.length} repositories.`);
 
       if (items.length === 0) {
@@ -820,11 +1177,36 @@ export default function App() {
         return;
       }
 
+      let searchResults = items;
+      if (searchMode !== 'profile' && items.length < 5) {
+        const broadenedClause = buildBroadenedQuery(targetQuery);
+        if (broadenedClause) {
+          let broadenedQuery = broadenedClause;
+          if (minStars > 0) {
+            broadenedQuery += ` stars:>=${minStars}`;
+          }
+          if (selectedLanguages.length > 0) {
+            const langClauses = selectedLanguages.map(lang => `language:${lang}`).join(' OR ');
+            broadenedQuery += ` (${langClauses})`;
+          }
+
+          log('info', `📡 Sparse hit count (${items.length}). Broadening semantic net for "${targetQuery}"...`);
+          const broadenedItems = await fetchSearchItems(
+            broadenedQuery,
+            '🛰️ Querying broadened semantic search...'
+          );
+          if (broadenedItems && broadenedItems.length > 0) {
+            searchResults = mergeUniqueItems([items, broadenedItems]);
+            log('success', `✓ Broadened discovery to ${searchResults.length} unique repositories.`);
+          }
+        }
+      }
+
       // Tight spam filter — name-only, not description
       const BLACKLIST = ['solana-casino', 'ethereum-casino', 'nft-game'];
       const uniqueCandidates = [];
       const seen = new Set();
-      for (const item of items) {
+      for (const item of searchResults) {
         const isBlacklisted = BLACKLIST.some(t => item.full_name.toLowerCase().includes(t));
         if (!isBlacklisted && !seen.has(item.full_name)) {
           seen.add(item.full_name);
@@ -996,9 +1378,9 @@ export default function App() {
 
         const createdDate = new Date(item.created_at);
         const diffDays = Math.ceil(Math.abs(Date.now() - createdDate) / 86400000) || 1;
+        const ageMonths = diffDays / 30;
         const starVelocity = item.stargazers_count / diffDays;
         const forkVelocity = item.forks_count / diffDays;
-        const ageMonths = diffDays / 30;
         
         // Flattening Penalty: If a repo is older than 1 year (365 days) and has low recent commits (< 5),
         // scale down its historical velocity scores. High-activity climbing repos maintain 100% scores.
@@ -1045,6 +1427,8 @@ export default function App() {
           call_to_action: cta,
           stars: item.stargazers_count,
           forks: item.forks_count,
+          ageDays: diffDays,
+          ageMonths,
           starVelocity,
           starVelocityEffective,
           forkVelocity,
@@ -1201,9 +1585,11 @@ export default function App() {
     const commits = selectedProject.commits || 0;
     const resolution = selectedProject.resolution || 0;
     const score = selectedProject.score || 0;
+    const repositoryCard = buildRepositoryCard(selectedProject, selectedPersona);
 
     return {
       ...selectedProject,
+      repositoryCard,
       stars: starsVal,
       forks: forksVal,
       starVelocity: Number(velocity).toFixed(1),
@@ -1212,7 +1598,7 @@ export default function App() {
       resolution: Math.round(resolution * 100),
       score: Number(score).toFixed(1)
     };
-  }, [selectedProject]);
+  }, [selectedProject, selectedPersona]);
 
   return (
     <div className="observatory-container">
@@ -1598,6 +1984,16 @@ export default function App() {
                 gap: '3px'
               }}
             >
+              {isScanning && scanProgress.total > 0 && (
+                <div style={{
+                  color: 'var(--gh-blue)',
+                  borderBottom: '1px solid var(--border)',
+                  paddingBottom: '4px',
+                  marginBottom: '3px'
+                }}>
+                  Scan progress: {scanProgress.done}/{scanProgress.total} repositories enriched
+                </div>
+              )}
               {consoleLogs.map((log, i) => (
                 <div key={i} style={{
                   color: log.type === 'error' || log.type === 'warn' ? '#ff7b72' : log.type === 'success' ? '#3fb950' : log.type === 'info' ? '#58a6ff' : '#8b949e',
@@ -1613,6 +2009,22 @@ export default function App() {
           {/* Controls Panel */}
           <div className="hud-panel">
             <span className="hud-panel-title">Observatory Controls</span>
+
+            <div className="hud-group">
+              <span className="hud-group-label">Evaluation Lens</span>
+              <div className="persona-grid">
+                {Object.entries(PERSONA_PROFILES).map(([personaId, persona]) => (
+                  <button
+                    key={personaId}
+                    className={`persona-btn ${selectedPersona === personaId ? 'active' : ''}`}
+                    onClick={() => setSelectedPersona(personaId)}
+                    title={persona.priority}
+                  >
+                    <span>{persona.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {!isMobile && (
               <div className="hud-group">
@@ -1793,6 +2205,18 @@ export default function App() {
             </div>
           </div>
 
+          {/* ── Mobile filter launcher ── */}
+          {isMobile && !sidebarOpen && !selectedProjectDetails && (
+            <button
+              className="mobile-fab"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open search & filters"
+            >
+              <span className="fab-icon">⚙</span>
+              <span className="fab-label">{isScanning ? 'Scanning…' : projects.length > 0 ? `Filters · ${filteredProjects.length}` : 'Search & Filters'}</span>
+            </button>
+          )}
+
           {activeViewMode === 'map' ? (
             <div className="galaxy-map-deck">
               {/* Telemetry Matrix Grid axes and crosshairs */}
@@ -1868,7 +2292,7 @@ export default function App() {
                         '--focus-glow': styles.glow,
                         '--star-size': `${project.bubbleSize}px`
                       }}
-                      onClick={() => setSelectedProject(project)}
+                      onClick={() => setSelectedProject(prev => prev?.repo === project.repo ? null : project)}
                       onMouseEnter={() => setHoveredProject(project)}
                       onMouseLeave={() => setHoveredProject(null)}
                     >
@@ -1925,7 +2349,10 @@ export default function App() {
                     className={`star-card rich-card ${selectedProject?.repo === project.repo ? 'selected' : ''}`}
                     key={idx}
                     style={{ '--focus-color': styles.color, '--focus-glow': styles.glow }}
-                    onClick={() => { setSelectedProject(project); if (isMobile) setSidebarOpen(false); }}
+                    onClick={() => {
+                      setSelectedProject(prev => prev?.repo === project.repo ? null : project);
+                      if (isMobile) setSidebarOpen(false);
+                    }}
                   >
                     {/* LEFT: text content */}
                     <div className="rich-card-left">
@@ -2109,18 +2536,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      {/* ── Mobile FAB: open sidebar drawer ── */}
-      {isMobile && !sidebarOpen && (
-        <button
-          className="mobile-fab"
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open search & filters"
-        >
-          <span className="fab-icon">⚙</span>
-          <span className="fab-label">{isScanning ? 'Scanning…' : projects.length > 0 ? `Filters · ${filteredProjects.length}` : 'Search & Filters'}</span>
-        </button>
-      )}
 
       {/* ════ PROJECT INSPECTOR DETAILS PANEL ════ */}
       <aside className={`project-inspector ${selectedProjectDetails ? 'active' : ''}`} style={selectedProjectDetails ? {
@@ -2546,11 +2961,6 @@ export default function App() {
                 </div>
               </div>
             )}
-
-            <div className="inspector-section">
-              <h4>Telemetry Assessment</h4>
-              <p className="inspector-cta">{selectedProjectDetails.call_to_action}</p>
-            </div>
 
             <div className="inspector-section">
               <h4>Telemetry Metrics</h4>
