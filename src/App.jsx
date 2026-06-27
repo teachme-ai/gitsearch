@@ -131,36 +131,75 @@ function buildRecoverySearchQuery(rawQuery) {
 }
 
 function buildBroadenedQuery(rawQuery) {
-  const terms = rawQuery.toLowerCase().trim().split(/\s+/);
-  const broadenedTerms = new Set();
+  const terms = (rawQuery || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (terms.length <= 1) return null;
 
-  for (const term of terms) {
-    if (term === 'rag') {
-      [
-        'retrieval augmented generation',
-        'semantic search',
-        'vector database',
-        'vector store',
-        'embeddings',
-        'knowledge base',
-        'question answering',
-        'langchain',
-        'llamaindex',
-        'haystack'
-      ].forEach(item => broadenedTerms.add(item));
+  // ── Step 1: Strip modifiers/adjectives ──
+  const MODIFIERS = new Set([
+    'fast', 'simple', 'easy', 'best', 'cool', 'lightweight', 'awesome', 'modern', 
+    'new', 'beautiful', 'clean', 'tiny', 'minimal', 'smart', 'great', 'super', 
+    'nice', 'friendly', 'user', 'latest', 'stable'
+  ]);
+  
+  const coreTerms = terms.filter(t => !MODIFIERS.has(t));
+  
+  // If we stripped modifiers and have at least 1 term left, rebuild the AND query
+  if (coreTerms.length > 0 && coreTerms.length < terms.length) {
+    const clauses = [];
+    for (const term of coreTerms) {
+      const termAtoms = new Set();
+      const cleanTerm = quoteGitHubSearchTerm(term);
+      if (!cleanTerm) continue;
+      termAtoms.add(cleanTerm);
+      
+      const extras = QUERY_EXPANSIONS[term] || [];
+      for (const extra of extras) {
+        const cleanExtra = quoteGitHubSearchTerm(extra);
+        if (cleanExtra && !cleanExtra.includes('"')) {
+          termAtoms.add(cleanExtra);
+        }
+      }
+      
+      if (termAtoms.size > 1) {
+        clauses.push(`(${Array.from(termAtoms).join(' OR ')})`);
+      } else {
+        clauses.push(cleanTerm);
+      }
+    }
+    if (clauses.length > 0) {
+      return `${clauses.join(' ')} in:name,description,readme archived:false`;
     }
   }
 
-  if (broadenedTerms.size === 0) return null;
+  // ── Step 2: Fallback to OR-joining core terms ──
+  const clauses = [];
+  const targetTerms = coreTerms.length > 0 ? coreTerms : terms;
+  for (const term of targetTerms) {
+    const termAtoms = new Set();
+    const cleanTerm = quoteGitHubSearchTerm(term);
+    if (!cleanTerm) continue;
+    termAtoms.add(cleanTerm);
+    
+    const extras = QUERY_EXPANSIONS[term] || [];
+    for (const extra of extras) {
+      const cleanExtra = quoteGitHubSearchTerm(extra);
+      if (cleanExtra && !cleanExtra.includes('"')) {
+        termAtoms.add(cleanExtra);
+      }
+    }
+    
+    if (termAtoms.size > 1) {
+      clauses.push(`(${Array.from(termAtoms).join(' OR ')})`);
+    } else {
+      clauses.push(cleanTerm);
+    }
+  }
 
-  const broadenedAtoms = Array.from(broadenedTerms)
-    .slice(0, 8)
-    .map(term => quoteGitHubSearchTerm(term))
-    .filter(Boolean);
-
-  if (broadenedAtoms.length === 0) return null;
-
-  return `(${broadenedAtoms.join(' OR ')}) in:name,description,readme archived:false`;
+  if (clauses.length > 0) {
+    return `(${clauses.join(' OR ')}) in:name,description,readme archived:false`;
+  }
+  
+  return null;
 }
 
 // ─── BM25+ ENGINE — upgraded from bm25s (xhluca/bm25s) ───────────────────────
