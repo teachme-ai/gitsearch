@@ -301,37 +301,43 @@ function computeBM25Rankings(query, repos) {
 
   const avgDocLen = documents.reduce((s, d) => s + d.length, 0) / N;
 
-  // BM25+ scoring — for each doc, sum over query terms
-  const scores = documents.map(doc => {
+  // BM25+ scoring — for each doc, calculate raw query term scores
+  const rawScores = documents.map(doc => {
     const freq = {};
     for (const t of doc) freq[t] = (freq[t] || 0) + 1;
     const L = doc.length;
 
-    // Count how many unique query terms are matched in this document
-    let matchedTermsCount = 0;
-    queryTokens.forEach(qt => {
-      if (freq[qt] > 0) matchedTermsCount++;
-    });
-
-    const rawScore = queryTokens.reduce((sum, qt) => {
+    return queryTokens.reduce((sum, qt) => {
       const tf = freq[qt] || 0;
       if (tf === 0) return sum;
       const tfNorm = tf * (K1 + 1) / (tf + K1 * (1 - B + B * L / avgDocLen));
       return sum + idf(qt) * (δ + tfNorm);
     }, 0);
-
-    // Apply coordination level boost: if matching all query terms, apply exponential boost
-    if (queryTokens.length > 1 && matchedTermsCount > 0) {
-      const coordinationFactor = matchedTermsCount / queryTokens.length;
-      // Exponential penalty for partial matching: e.g. matching 1/2 gets multiplied by 0.5^2 = 0.25
-      return rawScore * Math.pow(coordinationFactor, 2);
-    }
-
-    return rawScore;
   });
 
-  const maxScore = Math.max(...scores, 1e-9);
-  return scores.map(s => s / maxScore); // normalise → [0, 1]
+  const maxRawScore = Math.max(...rawScores, 1e-9);
+
+  return documents.map((doc, i) => {
+    const raw = rawScores[i];
+    const normalized = raw / maxRawScore; // [0, 1]
+
+    // Calculate matched query terms count for coordination penalty
+    const freq = {};
+    for (const t of doc) freq[t] = (freq[t] || 0) + 1;
+    let matchedTermsCount = 0;
+    queryTokens.forEach(qt => {
+      if (freq[qt] > 0) matchedTermsCount++;
+    });
+
+    // Apply coordination level factor AFTER normalization so partial matches are capped
+    if (queryTokens.length > 1) {
+      const coordinationFactor = matchedTermsCount / queryTokens.length;
+      // Exponential penalty for partial matching: e.g. matching 1/2 gets multiplied by 0.5^2 = 0.25 max relevance
+      return normalized * Math.pow(coordinationFactor, 2);
+    }
+
+    return normalized;
+  });
 }
 
 // ─── GitHub Language Color Map (official GitHub palette) ───────────────────
@@ -568,13 +574,13 @@ const getPersonaFit = (project, personaId = 'explorer') => {
   const stars = Number(project.stars) || 0;
   const forks = Number(project.forks) || 0;
   const ownerFollowers = Number(project.ownerFollowers) || 0;
-  const relevance = Number(project.bm25Score) || 0;
+  const relevance = project.bm25Score !== undefined ? Number(project.bm25Score) : null;
 
   const signals = {
     adoption: Math.min(100, Math.round((Math.log10(stars + 1) / 5) * 100)),
     momentum: Math.min(100, Math.round((velocity / 8) * 100)),
     operations: Math.min(100, Math.round((commits / 20) * 65 + resolution * 35)),
-    relevance: relevance > 0 ? Math.round(relevance * 100) : Math.min(100, Math.round((project.score || 0) / 3)),
+    relevance: relevance !== null ? Math.round(relevance * 100) : Math.min(100, Math.round((project.score || 0) / 3)),
     ecosystem: Math.min(100, Math.round((Math.log10(forks + 1) / 4) * 64 + Math.min(ownerFollowers / 5000, 1) * 36)),
   };
   signals.novelty = Math.max(0, Math.min(100, Math.round(70 + signals.momentum * 0.35 - signals.adoption * 0.45)));
@@ -1603,24 +1609,23 @@ export default function App() {
           const telNorm   = project.score / maxTel;                // [0,1]
           const fresh     = project.freshnessBoost || 0;          // [0,0.15]
           
-          // Re-rank score: weigh starVelocityEffective heavily (75%) + bm25 semantic match (25%)
+          // Re-rank score: weigh semantic match heavily (65%) + starVelocityEffective (35%)
           const maxVelInSet = Math.max(...accumulated.map(p => p.starVelocityEffective || 0), 1e-9);
           const velNorm = (project.starVelocityEffective || 0) / maxVelInSet;
-          const fusionScore = 0.75 * velNorm + 0.25 * bm25Norm;
+          const fusionScore = 0.65 * bm25Norm + 0.35 * velNorm;
           
           return { ...project, score: project.score, fusionScore, bm25Score: bm25Norm };
         });
 
-        // Sort strictly by starVelocityEffective (current growth rate) descending.
-        // If growth velocities are identical, sub-sort by total stars.
+        // Sort strictly by fusionScore (semantic relevance + momentum) descending.
         fused.sort((a, b) => {
-          const diff = (b.starVelocityEffective || 0) - (a.starVelocityEffective || 0);
+          const diff = (b.fusionScore || 0) - (a.fusionScore || 0);
           if (Math.abs(diff) > 1e-4) return diff;
           return b.stars - a.stars;
         });
         
         setProjects(fused);
-        log('success', `✨ SCAN COMPLETE. ${fused.length} PROJECTS — GROWTH VELOCITY SORT APPLIED.`);
+        log('success', `✨ SCAN COMPLETE. ${fused.length} PROJECTS — SEMANTIC FUSION SORT APPLIED.`);
       } else {
         log('success', `✨ SCAN COMPLETE. ${accumulated.length} PROJECTS ANCHORED.`);
       }
