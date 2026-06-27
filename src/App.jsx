@@ -708,11 +708,18 @@ export default function App() {
     const expandedTerms = expandQuery(targetQuery);
     
     // Generate compound word OR fallback (e.g. "open claw" OR "openclaw")
+    // If it's a single word, also expand to search for that username/profile ID
     let searchTermsClause = expandedTerms;
     const words = targetQuery.split(/\s+/);
     if (words.length > 1) {
       const compoundWord = words.join('');
       searchTermsClause = `(${expandedTerms}) OR "${compoundWord}"`;
+    } else if (words.length === 1) {
+      const singleWord = words[0];
+      // GitHub username requirements: alphanumeric or single hyphens, max 39 chars, cannot start/end with hyphen
+      if (/^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(singleWord)) {
+        searchTermsClause = `(${expandedTerms} OR user:${singleWord})`;
+      }
     }
 
     let finalQuery = `${searchTermsClause} stars:>${minStars}`;
