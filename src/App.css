@@ -6,11 +6,11 @@
 .observatory-container {
   display: flex;
   flex-direction: column;
-  max-width: 1440px;
+  max-width: 1760px;
   width: 100%;
   margin: 0 auto;
-  padding: 20px 48px 40px;
-  gap: 20px;
+  padding: 18px 28px 36px;
+  gap: 16px;
 }
 
 /* ════ METRICS STRIP ════ */
@@ -63,6 +63,19 @@
   grid-template-columns: 380px 1fr;
   gap: 20px;
   align-items: start;
+}
+
+.observatory-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  gap: 0;
+  min-width: 0;
+  align-items: start;
+}
+
+.observatory-workspace.has-inspector {
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  gap: 16px;
 }
 
 /* ════ SIDEBAR ════ */
@@ -197,6 +210,13 @@
 .scan-trigger-btn.scanning {
   background: #1f6feb;
   animation: pulse-scan 1.4s ease-in-out infinite;
+}
+
+.scan-trigger-btn.blocked,
+.scan-trigger-btn:disabled.blocked {
+  background: rgba(31, 111, 235, 0.18);
+  color: var(--text-secondary);
+  border-left-color: rgba(88, 166, 255, 0.15);
 }
 
 @keyframes pulse-scan {
@@ -1431,6 +1451,12 @@ input[type="password"]:focus {
 .score-bar-track { flex: 1; height: 3px; background: var(--bg-overlay); border-radius: 2px; overflow: hidden; }
 .score-bar-fill  { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
 .score-bar-value { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.score-bar-row.signal-good .score-bar-label,
+.score-bar-row.signal-good .score-bar-value { color: var(--gh-green); }
+.score-bar-row.signal-caution .score-bar-label,
+.score-bar-row.signal-caution .score-bar-value { color: var(--gh-orange); }
+.score-bar-row.signal-low .score-bar-label,
+.score-bar-row.signal-low .score-bar-value { color: var(--text-muted); }
 
 /* Sparkline chart panel */
 .rich-card-chart {
@@ -1670,23 +1696,31 @@ input[type="password"]:focus {
 
 /* ════ PROJECT INSPECTOR PANEL ════ */
 .project-inspector {
-  position: fixed;
-  top: 12px;
-  right: 12px;
-  width: min(360px, calc(100vw - 24px));
-  height: calc(100vh - 24px);
+  position: sticky;
+  top: 20px;
+  width: 100%;
+  min-width: 0;
+  height: calc(100vh - 40px);
   background: var(--bg-subtle);
   border-left: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 16px 40px rgba(0,0,0,0.35);
-  transform: translateX(100%);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transform: translateX(12px);
+  transition: opacity 0.22s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow-y: auto;
   z-index: 220;
   display: flex;
   flex-direction: column;
 }
-.project-inspector.active { transform: translateX(0); }
+.project-inspector.active {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transform: translateX(0);
+}
 
 .inspector-close {
   position: absolute;
@@ -2049,12 +2083,13 @@ input[type="password"]:focus {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 14px;
+  border-left: 3px solid var(--telemetry-signal-color, var(--gh-blue));
 }
 .score-large {
   font-family: var(--font-mono);
   font-size: 1.6rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--telemetry-signal-color, var(--text-primary));
   line-height: 1;
 }
 .metric-row {
@@ -2136,6 +2171,10 @@ input[type="password"]:focus {
   .observatory-container { padding: 12px 16px 32px; }
   .observatory-main { grid-template-columns: 1fr; gap: 14px; }
   .observatory-sidebar { position: static; }
+  .observatory-workspace {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
   .telemetry-hud { grid-template-columns: 1fr 1fr; }
   .hud-card { border-right: none; border-bottom: 1px solid var(--border); }
   .hud-card:nth-child(odd) { border-right: 1px solid var(--border); }
@@ -2159,19 +2198,24 @@ input[type="password"]:focus {
 
   /* ── Base container ── */
   .observatory-container {
-    padding: 10px 12px 100px; /* bottom pad so FAB doesn't overlap last card */
-    gap: 12px;
+    padding: 10px 10px 100px; /* bottom pad so FAB doesn't overlap last card */
+    gap: 10px;
   }
 
   /* ── Branding header ── */
   .observatory-container > div:first-child {
-    padding: 14px 14px !important;
+    padding: 12px 12px !important;
     border-radius: 6px;
+  }
+
+  .observatory-container > div:first-child img {
+    width: 42px !important;
+    height: 42px !important;
   }
 
   /* Shrink h1 */
   .observatory-container h1 {
-    font-size: 20px !important;
+    font-size: 18px !important;
     letter-spacing: -0.01em !important;
   }
 
@@ -2231,6 +2275,11 @@ input[type="password"]:focus {
   .mobile-inline-scan:disabled {
     background: #1f6feb;
     opacity: 0.8;
+  }
+
+  .mobile-inline-scan.blocked {
+    background: rgba(31, 111, 235, 0.18);
+    color: var(--text-secondary);
   }
 
   .mobile-inline-filter {
@@ -2404,6 +2453,31 @@ input[type="password"]:focus {
     overflow-wrap: anywhere;
   }
 
+  .star-card {
+    padding: 12px;
+  }
+
+  .tag-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .rich-card-title {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .rich-card-desc {
+    font-size: 12px;
+    -webkit-line-clamp: 3;
+  }
+
+  .status-badge,
+  .focus-tag {
+    font-size: 10px;
+  }
+
   /* ── Galaxy map: smaller on mobile ── */
   .galaxy-map-deck { min-height: 300px; }
 
@@ -2573,6 +2647,7 @@ input[type="password"]:focus {
     border-top: 1px solid var(--border) !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    position: fixed;
   }
 
   /* ── HUD panels inside drawer ── */
@@ -2632,6 +2707,14 @@ input[type="password"]:focus {
   margin: 0;
 }
 
+.launchpad-subtitle {
+  margin: -6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  max-width: 860px;
+}
+
 .launchpad-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -2669,13 +2752,52 @@ input[type="password"]:focus {
   color: var(--gh-blue);
 }
 
+.launchpad-card-proof {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
 .launchpad-card-query {
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.created-by-badge:hover {
+  opacity: 1 !important;
+}
+
+.gatekeeper-banner {
+  background: rgba(13, 17, 23, 0.72);
+  border: 1px solid rgba(88, 166, 255, 0.18);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin-bottom: 2px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.gatekeeper-banner-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gatekeeper-banner-kicker {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gh-blue);
+  font-weight: 800;
+}
+
+.gatekeeper-banner-text {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
 }
 
 /* Mobile overrides for Launchpad */
@@ -2696,5 +2818,11 @@ input[type="password"]:focus {
   }
   .launchpad-card-label {
     font-size: 12px;
+  }
+  .launchpad-subtitle {
+    font-size: 11px;
+  }
+  .launchpad-card-proof {
+    font-size: 11.5px;
   }
 }

@@ -61,18 +61,59 @@ const QUERY_EXPANSIONS = {
  * Example: "tts llm" → "tts llm text-to-speech speech-synthesis large-language-model gpt"
  */
 function expandQuery(rawQuery) {
-  const terms = rawQuery.toLowerCase().trim().split(/\s+/);
-  const clauses = [];
-  
+  return buildRepositorySearchQuery(rawQuery);
+}
+
+function quoteGitHubSearchTerm(term) {
+  const cleaned = (term || '').trim().replace(/^"+|"+$/g, '');
+  if (!cleaned) return '';
+  if (/[\s"']/.test(cleaned) || /[^\w]/.test(cleaned)) {
+    return `"${cleaned.replace(/"/g, '')}"`;
+  }
+  return cleaned;
+}
+
+function buildSearchAtoms(rawQuery, limit = 6) {
+  const terms = (rawQuery || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const atoms = new Set();
+
   for (const term of terms) {
-    const extras = QUERY_EXPANSIONS[term];
-    if (extras) {
-      clauses.push(`(${term} OR ${extras.join(' OR ')})`);
-    } else {
-      clauses.push(term);
+    atoms.add(quoteGitHubSearchTerm(term));
+    const extras = QUERY_EXPANSIONS[term] || [];
+    for (const extra of extras) {
+      atoms.add(quoteGitHubSearchTerm(extra));
     }
   }
-  return clauses.join(' ');
+
+  const trimmed = (rawQuery || '').toLowerCase().trim();
+  if (trimmed.includes(' ') || trimmed.includes('-')) {
+    atoms.add(quoteGitHubSearchTerm(trimmed));
+  }
+
+  return Array.from(atoms).filter(Boolean).slice(0, limit);
+}
+
+function buildRepositorySearchQuery(rawQuery) {
+  const atoms = buildSearchAtoms(rawQuery, 6);
+  if (atoms.length === 0) return '';
+  return `(${atoms.join(' OR ')}) in:name,description,readme archived:false`;
+}
+
+function buildRecoverySearchQuery(rawQuery) {
+  const terms = (rawQuery || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const recoveryTerms = [];
+
+  for (const term of terms.slice(0, 3)) {
+    recoveryTerms.push(quoteGitHubSearchTerm(term));
+    const extras = QUERY_EXPANSIONS[term] || [];
+    for (const extra of extras.slice(0, 1)) {
+      recoveryTerms.push(quoteGitHubSearchTerm(extra));
+    }
+  }
+
+  const compact = Array.from(new Set(recoveryTerms)).filter(Boolean);
+  if (compact.length === 0) return '';
+  return `(${compact.join(' OR ')}) in:name,description,readme archived:false`;
 }
 
 function buildBroadenedQuery(rawQuery) {
@@ -98,9 +139,14 @@ function buildBroadenedQuery(rawQuery) {
 
   if (broadenedTerms.size === 0) return null;
 
-  return Array.from(broadenedTerms)
-    .map(term => (term.includes(' ') ? `"${term}"` : term))
-    .join(' OR ');
+  const broadenedAtoms = Array.from(broadenedTerms)
+    .slice(0, 8)
+    .map(term => quoteGitHubSearchTerm(term))
+    .filter(Boolean);
+
+  if (broadenedAtoms.length === 0) return null;
+
+  return `(${broadenedAtoms.join(' OR ')}) in:name,description,readme archived:false`;
 }
 
 // ─── BM25+ ENGINE — upgraded from bm25s (xhluca/bm25s) ───────────────────────
@@ -398,6 +444,141 @@ const compactNumber = (value) => {
   if (numeric >= 1000000) return `${(numeric / 1000000).toFixed(1)}m`;
   if (numeric >= 1000) return `${(numeric / 1000).toFixed(1)}k`;
   return `${numeric}`;
+};
+
+const hashString = (input = '') => {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const createSeededRandom = (seed) => {
+  let state = seed >>> 0 || 1;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+};
+
+const getTelemetryScoreSignal = (score) => {
+  const value = Number(score) || 0;
+  if (value >= 120) {
+    return { label: 'Strong signal', tone: 'good', color: 'var(--gh-green)' };
+  }
+  if (value >= 60) {
+    return { label: 'Healthy signal', tone: 'good', color: 'var(--neon-cyan)' };
+  }
+  if (value >= 25) {
+    return { label: 'Watch closely', tone: 'caution', color: 'var(--gh-orange)' };
+  }
+  return { label: 'Low signal', tone: 'low', color: 'var(--text-muted)' };
+};
+
+const buildContributionCalendar = (repoKey = '', commits = 0) => {
+  const seed = hashString(`${repoKey}:${commits}`);
+  const random = createSeededRandom(seed);
+  const totalDays = 28 * 7;
+  const cells = [];
+  const mockMessages = [
+    'refactor: optimize BM25 search queries',
+    'fix: correct memory bounds in indexing loop',
+    'feat: integrate language donut visuals',
+    'docs: update README deployment configurations',
+    'test: assert rate limit metrics',
+    'chore: bump dev dependency libraries'
+  ];
+  const today = new Date();
+
+  for (let idx = 0; idx < totalDays; idx += 1) {
+    const col = Math.floor(idx / 7);
+    const row = idx % 7;
+    const commitFactor = Math.max(0.1, Math.min(1, Number(commits || 1) / 10));
+    const wave = Math.sin((col + (seed % 13)) * 0.18) * Math.cos((row + (seed % 7)) * 0.42) * 0.38 + 0.5;
+    const density = Math.min(1, Math.max(0, wave * commitFactor + random() * 0.08));
+
+    let bg = '#161b22';
+    let commitsCount = 0;
+    if (density > 0.75) { bg = '#39d353'; commitsCount = 5 + Math.floor(random() * 4); }
+    else if (density > 0.5) { bg = '#26a641'; commitsCount = 3 + Math.floor(random() * 2); }
+    else if (density > 0.25) { bg = '#006d32'; commitsCount = 1 + Math.floor(random() * 2); }
+    else if (density > 0.1) { bg = '#0e4429'; commitsCount = 1; }
+
+    const baseDate = new Date(today);
+    baseDate.setDate(baseDate.getDate() - (totalDays - idx));
+    const dateStr = baseDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const commitMsg = commitsCount > 0 ? mockMessages[(idx + (seed % mockMessages.length)) % mockMessages.length] : '';
+
+    cells.push({
+      bg,
+      commitsCount,
+      dateStr,
+      commitMsg,
+    });
+  }
+
+  return cells;
+};
+
+const UNIVERSAL_GATEKEEPER_WINDOW_MS = 60 * 1000;
+const UNIVERSAL_GATEKEEPER_LIMITS = {
+  free: 1,
+  authenticated: 2,
+};
+const UNIVERSAL_GATEKEEPER_STORAGE_KEY = 'GIT_OBSERVATORY_GATEKEEPER_V1';
+
+const formatCountdown = (ms) => {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  if (totalSeconds >= 60) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  }
+  return `${totalSeconds}s`;
+};
+
+const readUniversalGatekeeperState = () => {
+  try {
+    const raw = localStorage.getItem(UNIVERSAL_GATEKEEPER_STORAGE_KEY);
+    if (!raw) return { attempts: [], blockedUntil: 0 };
+    const parsed = JSON.parse(raw);
+    return {
+      attempts: Array.isArray(parsed.attempts) ? parsed.attempts : [],
+      blockedUntil: Number(parsed.blockedUntil) || 0,
+    };
+  } catch {
+    return { attempts: [], blockedUntil: 0 };
+  }
+};
+
+const pruneUniversalGatekeeperAttempts = (attempts, now) => (
+  (attempts || []).filter(attempt => now - Number(attempt?.ts || 0) < UNIVERSAL_GATEKEEPER_WINDOW_MS)
+);
+
+const getUniversalGatekeeperLimit = (hasToken) => (
+  hasToken ? UNIVERSAL_GATEKEEPER_LIMITS.authenticated : UNIVERSAL_GATEKEEPER_LIMITS.free
+);
+
+const getUniversalGatekeeperSnapshot = (state, hasToken, now = Date.now()) => {
+  const attempts = pruneUniversalGatekeeperAttempts(state?.attempts, now);
+  const limit = getUniversalGatekeeperLimit(hasToken);
+  const windowResetAt = attempts.length > 0 ? attempts[0].ts + UNIVERSAL_GATEKEEPER_WINDOW_MS : 0;
+  const rollingWaitUntil = attempts.length >= limit ? windowResetAt : 0;
+  const blockedUntil = Math.max(Number(state?.blockedUntil) || 0, rollingWaitUntil);
+  const waitMs = Math.max(0, blockedUntil - now);
+
+  return {
+    attempts,
+    limit,
+    used: attempts.length,
+    remaining: Math.max(0, limit - attempts.length),
+    blockedUntil,
+    waitMs,
+    blocked: waitMs > 0,
+    windowMs: UNIVERSAL_GATEKEEPER_WINDOW_MS,
+  };
 };
 
 const getRepoShortName = (repo = '') => repo.split('/')[1] || repo || 'this repository';
@@ -706,6 +887,8 @@ export default function App() {
   });
   const [scanProgress, setScanProgress] = useState({ done: 0, total: 0 });
   const [hasRateLimitError, setHasRateLimitError] = useState(false);
+  const [gatekeeperState, setGatekeeperState] = useState(() => readUniversalGatekeeperState());
+  const [gateClock, setGateClock] = useState(() => Date.now());
 
   // Scanner states
   const [isScanning, setIsScanning] = useState(false);
@@ -755,6 +938,7 @@ export default function App() {
           const items = data.items || [];
           
           const SAFE_TOPICS_MAP = {
+            // ── AI & Data Science ──
             'ai-agents': '🤖 AI Agents',
             'agents': '🤖 AI Agents',
             'rag': '🧬 Vector Search',
@@ -772,11 +956,6 @@ export default function App() {
             'vllm': '⚡ vLLM Engine',
             'wasm': '🕸️ WebAssembly',
             'webassembly': '🕸️ WebAssembly',
-            'nextjs': '🌐 Next.js',
-            'fastapi': '⚡ FastAPI',
-            'tailwind': '🎨 TailwindCSS',
-            'shadcn': '🎨 Shadcn UI',
-            'swiftui': '🍏 SwiftUI',
             'pytorch': '🔥 PyTorch',
             'tensorflow': '🍊 TensorFlow',
             'cuda': '⚡ NVIDIA CUDA',
@@ -787,7 +966,52 @@ export default function App() {
             'computer-vision': '👁️ Computer Vision',
             'nlp': '💬 NLP Core',
             'fine-tuning': '🎯 Fine-Tuning',
-            'compiler': '⚙️ Compiler Engine'
+            'compiler': '⚙️ Compiler Engine',
+
+            // ── No-Code, Builders & General Web Templates ──
+            'portfolio': '🌐 Portfolio Sites',
+            'website-template': '🌐 Site Templates',
+            'nocode': '🧱 No-Code Tools',
+            'low-code': '🧱 Low-Code Builders',
+            'landing-page': '🚀 Landing Pages',
+            'blog': '✍️ Blog Templates',
+            'static-site-generator': '🌐 Site Generators',
+
+            // ── End-User Apps & Utilities ──
+            'productivity': '📝 Productivity Tools',
+            'notes': '📝 Note Taking Apps',
+            'automation': '⚡ Automation Systems',
+            'browser-extension': '🔌 Browser Addons',
+            'chrome-extension': '🔌 Chrome Extensions',
+            'self-hosted': '🏠 Self-Hosted Apps',
+            'homelab': '🏠 Homelab Apps',
+            'macos': '💻 macOS Utilities',
+            'desktop-app': '💻 Desktop Apps',
+            'audio-player': '🎵 Music & Audio',
+            'video-editor': '🎥 Video Editors',
+
+            // ── Visuals, UI & Design ──
+            'design-system': '🎨 Design Systems',
+            'figma': '🎨 Figma Assets',
+            'icons': '✨ Icon Packs',
+            'svg': '✨ SVG Graphics',
+            'fonts': '✍️ Typography & Fonts',
+            'dashboard': '📊 Dashboards',
+            'charts': '📈 Analytics & Charts',
+
+            // ── Web Frameworks & UI Kits ──
+            'nextjs': '🌐 Next.js',
+            'fastapi': '⚡ FastAPI',
+            'tailwind': '🎨 TailwindCSS',
+            'shadcn': '🎨 Shadcn UI',
+            'swiftui': '🍏 SwiftUI',
+
+            // ── Resources, Education & Guides ──
+            'roadmap': '🗺️ Career Roadmaps',
+            'cheatsheet': '📋 Cheat Sheets',
+            'books': '📚 Recommended Books',
+            'curriculum': '📚 Study Courses',
+            'api': '🔌 Web APIs'
           };
 
           const topicCounts = {};
@@ -814,16 +1038,16 @@ export default function App() {
             };
           });
 
-          // Backfill from a curated safe developer set if we have fewer than 8 trending whitelisted topics
+          // Backfill set if we have fewer than 8 trending whitelisted topics
           const fallbackList = [
             'ai-agents',
-            'rag',
-            'llm',
-            'mlx',
+            'portfolio',
+            'productivity',
+            'nocode',
             'deepseek',
-            'llmops',
-            'embeddings',
-            'webgpu'
+            'icons',
+            'design-system',
+            'roadmap'
           ];
 
           if (suggestionsList.length < 8) {
@@ -851,6 +1075,19 @@ export default function App() {
 
     fetchTrendingTopics();
   }, [customToken]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setGateClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(UNIVERSAL_GATEKEEPER_STORAGE_KEY, JSON.stringify(gatekeeperState));
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [gatekeeperState]);
   
   const fallbackSuggestions = [
     { label: "💡 How LLMs work", query: "I want to learn how LLM's work.", mode: 'natural' },
@@ -863,8 +1100,40 @@ export default function App() {
 
   const suggestions = trendingTopics.length > 0 ? trendingTopics : fallbackSuggestions;
 
+  const universalGatekeeper = useMemo(
+    () => getUniversalGatekeeperSnapshot(gatekeeperState, Boolean(customToken), gateClock),
+    [gatekeeperState, customToken, gateClock]
+  );
+
+  const reserveUniversalGatekeeperSlot = () => {
+    const now = Date.now();
+    const snapshot = getUniversalGatekeeperSnapshot(gatekeeperState, Boolean(customToken), now);
+    if (snapshot.blocked) {
+      return { allowed: false, snapshot };
+    }
+
+    const nextState = {
+      attempts: [...snapshot.attempts, { ts: now }],
+      blockedUntil: 0,
+    };
+    setGatekeeperState(nextState);
+    return {
+      allowed: true,
+      snapshot: getUniversalGatekeeperSnapshot(nextState, Boolean(customToken), now),
+    };
+  };
+
+  const applyUniversalGatekeeperCooldown = (waitMs, reason = 'rate limit') => {
+    const until = Date.now() + Math.max(1000, waitMs);
+    setGatekeeperState(prev => ({
+      attempts: pruneUniversalGatekeeperAttempts(prev.attempts, Date.now()),
+      blockedUntil: Math.max(Number(prev.blockedUntil) || 0, until),
+      reason,
+    }));
+  };
+
   const handleSuggestionClick = (query, mode) => {
-    setSearchMode(mode);
+    setSearchMode(mode || 'repository');
     setSearchQuery(query);
     performGitHubSearch(query);
   };
@@ -1172,22 +1441,6 @@ export default function App() {
 
   const performGitHubSearch = async (overrideQuery = null) => {
     if (isScanning) return;
-    setHasSearched(true);
-    setSidebarOpen(false);
-    if (isMobile) {
-      setViewMode('grid');
-    }
-    
-    // Reset filters on new search to ensure all new results are visible
-    setSelectedFocus('All');
-    setSelectedQuadrant('All');
-    setSelectedLanguages([]);
-    setCurrentPage(1);
-
-    setIsScanning(true);
-    setConsoleLogs([]);
-    setProjects([]);
-    setScanProgress({ done: 0, total: 0 });
 
     const log = (type, text) => {
       setConsoleLogs(prev => [...prev, { type, text }]);
@@ -1215,6 +1468,44 @@ export default function App() {
       setIsScanning(false);
       return;
     }
+
+    const gateSnapshot = getUniversalGatekeeperSnapshot(gatekeeperState, Boolean(customToken));
+    if (gateSnapshot.blocked) {
+      log(
+        'warn',
+        `🛑 Universal Gatekeeper: free scans are capped at ${gateSnapshot.limit} launch${gateSnapshot.limit === 1 ? '' : 'es'} per ${Math.round(gateSnapshot.windowMs / 1000)}s. Used ${gateSnapshot.used}/${gateSnapshot.limit}. Wait ${formatCountdown(gateSnapshot.waitMs)} before trying again.`
+      );
+      setIsScanning(false);
+      return;
+    }
+
+    const gateReservation = reserveUniversalGatekeeperSlot();
+    if (!gateReservation.allowed) {
+      const blocked = gateReservation.snapshot;
+      log(
+        'warn',
+        `🛑 Universal Gatekeeper: free scans are capped at ${blocked.limit} launch${blocked.limit === 1 ? '' : 'es'} per ${Math.round(blocked.windowMs / 1000)}s. Used ${blocked.used}/${blocked.limit}. Wait ${formatCountdown(blocked.waitMs)} before trying again.`
+      );
+      setIsScanning(false);
+      return;
+    }
+
+    setHasSearched(true);
+    setSidebarOpen(false);
+    if (isMobile) {
+      setViewMode('grid');
+    }
+
+    // Reset filters on new search to ensure all new results are visible
+    setSelectedFocus('All');
+    setSelectedQuadrant('All');
+    setSelectedLanguages([]);
+    setCurrentPage(1);
+
+    setIsScanning(true);
+    setConsoleLogs([]);
+    setProjects([]);
+    setScanProgress({ done: 0, total: 0 });
 
     // ── NLP Sentence Pre-parsing ──
     if (searchMode === 'natural' && overrideQuery === null) {
@@ -1261,16 +1552,8 @@ export default function App() {
       // Profile Search: query strictly by owner username
       searchTermsClause = `user:${targetQuery}`;
     } else {
-      // Repository Search: query by keywords with synonym expansions & coordination boosts
-      const expandedTerms = expandQuery(targetQuery);
-      searchTermsClause = expandedTerms;
-      const words = targetQuery.split(/\s+/);
-      if (words.length > 1) {
-        const compoundWord = words.join('');
-        searchTermsClause = `(${expandedTerms}) OR "${compoundWord}"`;
-      } else if (words.length === 1) {
-        searchTermsClause = expandedTerms;
-      }
+      // Repository Search: query by keywords with safe synonym expansions
+      searchTermsClause = expandQuery(targetQuery);
     }
 
     let finalQuery = searchTermsClause;
@@ -1294,9 +1577,25 @@ export default function App() {
       const response = await fetch(searchUrl, { headers });
       if (!response.ok) {
         if (response.status === 403 || response.status === 429) {
-          log('warn', '⚠️ Sector blocked: GitHub Search API rate limit reached.');
+          const retryAfter = Number(response.headers.get('retry-after')) * 1000 || 0;
+          const resetAt = Number(response.headers.get('x-ratelimit-reset')) * 1000 || 0;
+          const waitMs = retryAfter > 0
+            ? retryAfter
+            : resetAt > Date.now()
+              ? resetAt - Date.now()
+              : UNIVERSAL_GATEKEEPER_WINDOW_MS;
+
+          applyUniversalGatekeeperCooldown(waitMs, `GitHub responded with ${response.status}`);
+          log(
+            'warn',
+            `⚠️ GitHub API rate limit triggered (${response.status}). Hold for ${formatCountdown(waitMs)} before the next scan.`
+          );
           setHasRateLimitError(true);
           return null;
+        }
+        if (response.status === 422) {
+          log('warn', '⚠️ GitHub rejected the search syntax. Falling back to a simpler query.');
+          return [];
         }
         throw new Error(`API status ${response.status}`);
       }
@@ -1319,21 +1618,61 @@ export default function App() {
     };
 
     try {
-      const items = await fetchSearchItems(finalQuery);
+      let items = await fetchSearchItems(finalQuery);
+      let usedRecoveryQuery = false;
+      let usedBroadenedQuery = false;
+
       if (items === null) {
         setIsScanning(false);
         return;
       }
-      log('success', `✓ Discovered ${items.length} repositories.`);
+
+      if (items.length === 0 && searchMode !== 'profile') {
+        const recoveryQuery = buildRecoverySearchQuery(targetQuery);
+        if (recoveryQuery && recoveryQuery !== finalQuery) {
+          log('warn', `⚠️ Primary query was too narrow. Retrying with a broader recovery query.`);
+          finalQuery = recoveryQuery;
+          usedRecoveryQuery = true;
+          items = await fetchSearchItems(finalQuery, '🛰️ Querying recovery semantic search...');
+        }
+      }
+      log('success', `✓ Discovered ${items.length} repositories${usedRecoveryQuery ? ' via recovery query' : ''}.`);
 
       if (items.length === 0) {
-        log('warn', `🔭 No repositories found matching "${targetQuery}" with stars > ${minStars}. Try lowering the "Min Stars Threshold" slider in the sidebar!`);
-        setIsScanning(false);
-        return;
+        if (searchMode !== 'profile') {
+          const broadenedClause = buildBroadenedQuery(targetQuery);
+          if (broadenedClause) {
+            let broadenedQuery = broadenedClause;
+            if (minStars > 0) {
+              broadenedQuery += ` stars:>=${minStars}`;
+            }
+            if (selectedLanguages.length > 0) {
+              const langClauses = selectedLanguages.map(lang => `language:${lang}`).join(' OR ');
+              broadenedQuery += ` (${langClauses})`;
+            }
+
+            log('info', `📡 Sparse hit count (${items.length}). Broadening semantic net for "${targetQuery}"...`);
+            const broadenedItems = await fetchSearchItems(
+              broadenedQuery,
+              '🛰️ Querying broadened semantic search...'
+            );
+            if (broadenedItems && broadenedItems.length > 0) {
+              items = mergeUniqueItems([items, broadenedItems]);
+              log('success', `✓ Broadened discovery to ${items.length} unique repositories.`);
+              usedBroadenedQuery = true;
+            }
+          }
+        }
+
+        if (items.length === 0) {
+          log('warn', `🔭 No repositories found matching "${targetQuery}" with stars > ${minStars}. Try lowering the "Min Stars Threshold" slider in the sidebar!`);
+          setIsScanning(false);
+          return;
+        }
       }
 
       let searchResults = items;
-      if (searchMode !== 'profile' && items.length < 5) {
+      if (searchMode !== 'profile' && items.length < 5 && !usedBroadenedQuery) {
         const broadenedClause = buildBroadenedQuery(targetQuery);
         if (broadenedClause) {
           let broadenedQuery = broadenedClause;
@@ -1353,6 +1692,7 @@ export default function App() {
           if (broadenedItems && broadenedItems.length > 0) {
             searchResults = mergeUniqueItems([items, broadenedItems]);
             log('success', `✓ Broadened discovery to ${searchResults.length} unique repositories.`);
+            usedBroadenedQuery = true;
           }
         }
       }
@@ -1750,41 +2090,47 @@ export default function App() {
       forkVelocity: Number(forkVel).toFixed(1),
       commits,
       resolution: Math.round(resolution * 100),
-      score: Number(score).toFixed(1)
+      score: Number(score).toFixed(1),
+      telemetrySignal: getTelemetryScoreSignal(score)
     };
   }, [selectedProject, selectedPersona]);
+
+  const contributionHeatmap = useMemo(() => {
+    if (!selectedProjectDetails?.repo) return [];
+    return buildContributionCalendar(selectedProjectDetails.repo, selectedProjectDetails.commits || 0);
+  }, [selectedProjectDetails?.repo, selectedProjectDetails?.commits]);
 
   return (
     <div className="observatory-container">
       
       {/* Branding Header Block & First-Time Visitor Guide */}
-      <div style={{
-        background: 'var(--bg-subtle)',
-        border: '1px solid var(--border)',
-        borderRadius: '6px',
-        padding: '24px 28px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px'
+          <div style={{
+          background: 'var(--bg-subtle)',
+          border: '1px solid var(--border)',
+          borderRadius: '6px',
+          padding: '18px 22px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <img 
                   src="/logo.jpg" 
                   alt="GitObs Logo" 
                   style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '8px',
+                    width: '58px',
+                    height: '58px',
+                    borderRadius: '10px',
                     border: '1px solid rgba(88,166,255,0.3)',
                     boxShadow: '0 0 10px rgba(88,166,255,0.15)'
                   }}
                 />
                 <h1 style={{
                   margin: 0,
-                  fontSize: '28px',
+                  fontSize: '32px',
                   fontWeight: 850,
                   color: 'var(--text-primary)',
                   letterSpacing: '-0.02em'
@@ -1792,40 +2138,42 @@ export default function App() {
                   GitObs
                 </h1>
               </div>
+            </div>
+            <p style={{
+              margin: '4px 0 0',
+              fontSize: '12.5px',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.45,
+              maxWidth: '760px',
+              fontWeight: 500
+            }}>
+              Discover high-signal GitHub repositories for whatever you are evaluating. Scan any topic to instantly filter, rank, and explore codebases by their growth velocity, activity levels, lineage signals, and AI-powered code summaries.
+            </p>
+            <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-start' }}>
               <a 
                 href="https://www.linkedin.com/in/irfankhalid/"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  background: 'rgba(88,166,255,0.12)',
-                  border: '1px solid rgba(88,166,255,0.3)',
+                  background: 'rgba(88,166,255,0.08)',
+                  border: '1px solid rgba(88,166,255,0.22)',
                   color: 'var(--gh-blue)',
-                  fontSize: '11px',
+                  fontSize: '9px',
                   fontWeight: 700,
-                  padding: '3px 10px',
-                  borderRadius: '12px',
+                  padding: '2px 7px',
+                  borderRadius: '999px',
                   textDecoration: 'none',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  marginTop: '4px',
-                  transition: 'background 0.15s ease'
+                  opacity: 0.78,
+                  transition: 'opacity 0.15s ease, background 0.15s ease'
                 }}
                 className="created-by-badge"
               >
                 <span>Created by</span> <strong>Khalid Irfan</strong>
               </a>
             </div>
-            <p style={{
-              margin: '6px 0 0',
-              fontSize: '13.5px',
-              color: 'var(--text-secondary)',
-              lineHeight: 1.5,
-              maxWidth: '850px',
-              fontWeight: 500
-            }}>
-              Find interesting and relevant GitHub repositories for whatever you are searching for. Scan any topic to instantly filter, rank, and explore codebases by their growth velocity, activity levels, and AI-powered code summaries.
-            </p>
           </div>
           {showGuide && (
             <button
@@ -1873,11 +2221,12 @@ export default function App() {
                 }}
               />
               <button
-                className={`mobile-inline-scan ${isScanning ? 'scanning' : ''}`}
+                className={`mobile-inline-scan ${isScanning ? 'scanning' : ''} ${universalGatekeeper.blocked ? 'blocked' : ''}`}
                 onClick={() => performGitHubSearch(searchQuery)}
-                disabled={isScanning}
+                disabled={isScanning || universalGatekeeper.blocked}
+                title={universalGatekeeper.blocked ? `Gatekeeper cooldown: wait ${formatCountdown(universalGatekeeper.waitMs)} before scanning again.` : 'Run telemetry scan'}
               >
-                {isScanning ? 'Scanning' : 'Scan'}
+                {isScanning ? 'Scanning' : universalGatekeeper.blocked ? `Wait ${formatCountdown(universalGatekeeper.waitMs)}` : 'Scan'}
               </button>
             </div>
             <button
@@ -1894,37 +2243,37 @@ export default function App() {
             background: 'var(--bg-canvas)',
             border: '1px solid var(--border)',
             borderRadius: '6px',
-            padding: '16px 20px',
+            padding: '12px 14px',
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '16px'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '12px'
           }}>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(88,166,255,0.15)', color: 'var(--gh-blue)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>1</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(88,166,255,0.15)', color: 'var(--gh-blue)', fontSize: '9px', fontWeight: 800, flexShrink: 0 }}>1</span>
               <div>
-                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Scan Keywords</strong>
-                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Type keywords (e.g. <code>mlx</code>, <code>agent</code>) and hit <strong>Scan</strong> to fetch live telemetries.</span>
+                <strong style={{ display: 'block', fontSize: '11px', color: 'var(--text-primary)', marginBottom: '2px' }}>Scan Keywords</strong>
+                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: '1.35', display: 'block' }}>Type keywords (e.g. <code>mlx</code>, <code>agent</code>) and hit <strong>Scan</strong> to fetch live telemetries.</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(63,185,80,0.15)', color: 'var(--gh-green)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>2</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(63,185,80,0.15)', color: 'var(--gh-green)', fontSize: '9px', fontWeight: 800, flexShrink: 0 }}>2</span>
               <div>
-                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Adjust Star Filters</strong>
-                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Drag the stars slider to <code>0</code> to discover emerging libraries (like <code>mynah-ui</code>).</span>
+                <strong style={{ display: 'block', fontSize: '11px', color: 'var(--text-primary)', marginBottom: '2px' }}>Adjust Star Filters</strong>
+                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: '1.35', display: 'block' }}>Drag the stars slider to <code>0</code> to discover emerging libraries (like <code>mynah-ui</code>).</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(210,153,34,0.15)', color: 'var(--gh-orange)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>3</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(210,153,34,0.15)', color: 'var(--gh-orange)', fontSize: '9px', fontWeight: 800, flexShrink: 0 }}>3</span>
               <div>
-                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Inspect Repositories</strong>
-                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Click any card node in the grid to slide open details, commit heatmaps, and AI summaries.</span>
+                <strong style={{ display: 'block', fontSize: '11px', color: 'var(--text-primary)', marginBottom: '2px' }}>Inspect Repositories</strong>
+                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: '1.35', display: 'block' }}>Click any card node in the grid to slide open details, commit heatmaps, and AI summaries.</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(139,92,246,0.15)', color: 'var(--neon-violet)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>4</span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(139,92,246,0.15)', color: 'var(--neon-violet)', fontSize: '9px', fontWeight: 800, flexShrink: 0 }}>4</span>
               <div>
-                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Authentication</strong>
-                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Add your GitHub Token at the bottom of the sidebar to bypass Search API rate limits.</span>
+                <strong style={{ display: 'block', fontSize: '11px', color: 'var(--text-primary)', marginBottom: '2px' }}>Authentication</strong>
+                <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: '1.35', display: 'block' }}>Add your GitHub Token at the bottom of the sidebar to bypass Search API rate limits.</span>
               </div>
             </div>
           </div>
@@ -1961,8 +2310,21 @@ export default function App() {
               textDecoration: 'none'
             }}
           >
-            Create Token
+          Create Token
           </a>
+        </div>
+      )}
+      {(universalGatekeeper.used > 0 || universalGatekeeper.blocked) && (
+        <div className="gatekeeper-banner">
+          <div className="gatekeeper-banner-copy">
+            <span className="gatekeeper-banner-kicker">Universal Gatekeeper</span>
+            <span className="gatekeeper-banner-text">
+              Free use is capped at {universalGatekeeper.limit} scan{universalGatekeeper.limit === 1 ? '' : 's'} per {Math.round(universalGatekeeper.windowMs / 1000)} seconds.
+              {' '}
+              Used {universalGatekeeper.used}/{universalGatekeeper.limit}.
+              {universalGatekeeper.blocked ? ` Wait ${formatCountdown(universalGatekeeper.waitMs)} before the next scan.` : ' The gate resets automatically after the window rolls over.'}
+            </span>
+          </div>
         </div>
       )}
       {/* ════ MAIN TELEMETRY INTERFACE ════ */}
@@ -1997,18 +2359,18 @@ export default function App() {
             <div className="app-wordmark" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
               <img 
                 src="/logo.jpg" 
-                alt="Logo" 
+                alt="GitObs Logo" 
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '6px',
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '10px',
                   border: '1px solid rgba(88,166,255,0.25)',
                   flexShrink: 0
                 }}
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                <span className="app-wordmark-title" style={{ fontSize: '15px', fontWeight: 800 }}>GitObs</span>
-                <span className="app-wordmark-sub" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Real-time repository search &amp; health telemetry</span>
+                <span className="app-wordmark-title" style={{ fontSize: '20px', fontWeight: 800 }}>GitObs</span>
+                <span className="app-wordmark-sub" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Repository discovery &amp; credibility telemetry</span>
               </div>
             </div>
             <div className="search-mode-selector" style={{
@@ -2093,11 +2455,12 @@ export default function App() {
                 }}
               />
               <button
-                className={`scan-trigger-btn ${isScanning ? 'scanning' : ''}`}
+                className={`scan-trigger-btn ${isScanning ? 'scanning' : ''} ${universalGatekeeper.blocked ? 'blocked' : ''}`}
                 onClick={() => performGitHubSearch(searchQuery)}
-                disabled={isScanning}
+                disabled={isScanning || universalGatekeeper.blocked}
+                title={universalGatekeeper.blocked ? `Gatekeeper cooldown: wait ${formatCountdown(universalGatekeeper.waitMs)} before scanning again.` : 'Run telemetry scan'}
               >
-                {isScanning ? '⏳' : '⚡ SCAN'}
+                {isScanning ? '⏳' : universalGatekeeper.blocked ? `⏳ ${formatCountdown(universalGatekeeper.waitMs)}` : '⚡ SCAN'}
               </button>
             </div>
           </div>
@@ -2162,7 +2525,7 @@ export default function App() {
 
           {/* Controls Panel */}
           <div className="hud-panel">
-            <span className="hud-panel-title">Observatory Controls</span>
+            <span className="hud-panel-title">Discovery Controls</span>
 
             <div className="hud-group">
               <span className="hud-group-label">Evaluation Lens</span>
@@ -2325,8 +2688,9 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Right Side: Telemetry Matrix or Grid */}
-        <main className={`${activeViewMode === 'map' ? 'stars-quadrant-map-container' : 'stars-quadrant'} ${filteredProjects.length === 0 ? 'is-empty' : ''}`}>
+        <div className={`observatory-workspace${selectedProjectDetails ? ' has-inspector' : ''}`}>
+          {/* Right Side: Telemetry Matrix or Grid */}
+          <main className={`${activeViewMode === 'map' ? 'stars-quadrant-map-container' : 'stars-quadrant'} ${filteredProjects.length === 0 ? 'is-empty' : ''}`}>
           
           {/* Integrated Compact Telemetry Metrics Row */}
           {projects.length > 0 && (
@@ -2376,16 +2740,73 @@ export default function App() {
           {projects.length === 0 && !isScanning && !hasSearched ? (
             <div className="launchpad-container">
               <h3 className="launchpad-title">
-                Suggested Observatory Scans
+                Credibility Test Bench
               </h3>
+              <p className="launchpad-subtitle">
+                Pressure-test GitObs with scenarios that check source-repo lineage, adoption, upkeep, and hype control.
+              </p>
               <div className="launchpad-grid">
-                {suggestions.map((s, idx) => (
+                {[
+                  {
+                    label: 'Foundational source repo',
+                    query: 'framework sdk starter template plugin adapter',
+                    mode: 'repository',
+                    proof: 'Checks whether GitObs can surface the base repository that downstream projects copy from.'
+                  },
+                  {
+                    label: 'RAG stack reality check',
+                    query: 'rag vector search embeddings langchain llamaindex haystack',
+                    mode: 'repository',
+                    proof: 'Checks whether GitObs separates working retrieval stacks from buzzword wrappers.'
+                  },
+                  {
+                    label: 'Enterprise readiness',
+                    query: 'llmops mlops observability security governance deployment',
+                    mode: 'repository',
+                    proof: 'Checks whether GitObs prioritizes maintained tools with production evidence.'
+                  },
+                  {
+                    label: 'Community gravity',
+                    query: 'awesome roadmap handbook tutorial curriculum',
+                    mode: 'repository',
+                    proof: 'Checks whether GitObs distinguishes broad community hubs from shallow copies.'
+                  },
+                  {
+                    label: 'Hype vs upkeep',
+                    query: 'vector search',
+                    mode: 'repository',
+                    proof: 'Checks whether GitObs notices star traction that outruns maintenance.'
+                  },
+                  {
+                    label: 'Lineage and reuse map',
+                    query: 'boilerplate starter clone plugin adapter',
+                    mode: 'repository',
+                    proof: 'Checks whether GitObs can detect derivative ecosystems and source repositories.'
+                  }
+                ].map((s, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSuggestionClick(s.query, s.mode)}
                     className="launchpad-card"
                   >
                     <span className="launchpad-card-label">{s.label}</span>
+                    <span className="launchpad-card-proof">{s.proof}</span>
+                    <span className="launchpad-card-query">"{s.query}"</span>
+                  </button>
+                ))}
+              </div>
+              <h3 className="launchpad-title" style={{ marginTop: '4px' }}>
+                Live Discovery Seeds
+              </h3>
+              <div className="launchpad-grid">
+                {suggestions.slice(0, 4).map((s, idx) => (
+                  <button
+                    key={`seed-${idx}`}
+                    onClick={() => handleSuggestionClick(s.query, s.mode)}
+                    className="launchpad-card"
+                  >
+                    <span className="launchpad-card-label">{s.label}</span>
+                    {s.proof && <span className="launchpad-card-proof">{s.proof}</span>}
                     <span className="launchpad-card-query">"{s.query}"</span>
                   </button>
                 ))}
@@ -2518,6 +2939,7 @@ export default function App() {
               filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((project, idx) => {
                 const styles = getFocusStyles(project.focus);
                 const statusInfo = calculateTelemetryTier(project);
+                const scoreSignal = getTelemetryScoreSignal(project.score);
                 return (
                   <article
                     className={`star-card rich-card ${selectedProject?.repo === project.repo ? 'selected' : ''}`}
@@ -2660,18 +3082,18 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="score-bar-row">
+                      <div className={`score-bar-row signal-${scoreSignal.tone}`}>
                         <span className="score-bar-label">Telemetry Score</span>
                         <div className="score-bar-track">
                           <div
                             className="score-bar-fill"
                             style={{
                               width: `${Math.min(100, (project.score / 300) * 100)}%`,
-                              background: `linear-gradient(90deg, var(--focus-color), var(--focus-glow))`
+                              background: `linear-gradient(90deg, ${scoreSignal.color}, var(--focus-glow))`
                             }}
                           />
                         </div>
-                        <span className="score-bar-value">{Number(project.score).toFixed(0)}</span>
+                        <span className="score-bar-value" style={{ color: scoreSignal.color }}>{Number(project.score).toFixed(0)}</span>
                       </div>
                     </div>
                   </article>
@@ -2708,14 +3130,13 @@ export default function App() {
               </button>
             </div>
           )}
-        </main>
-      </div>
+          </main>
 
-      {/* ════ PROJECT INSPECTOR DETAILS PANEL ════ */}
-      <aside className={`project-inspector ${selectedProjectDetails ? 'active' : ''}`} style={selectedProjectDetails ? {
-        '--focus-color': getFocusStyles(selectedProjectDetails.focus).color,
-        '--focus-glow': getFocusStyles(selectedProjectDetails.focus).glow
-      } : {}}>
+          {/* ════ PROJECT INSPECTOR DETAILS PANEL ════ */}
+          <aside className={`project-inspector ${selectedProjectDetails ? 'active' : ''}`} style={selectedProjectDetails ? {
+            '--focus-color': getFocusStyles(selectedProjectDetails.focus).color,
+            '--focus-glow': getFocusStyles(selectedProjectDetails.focus).glow
+          } : {}}>
         {selectedProjectDetails && (
           <>
             <button className="inspector-close" onClick={() => setSelectedProject(null)}>✕</button>
@@ -2803,80 +3224,49 @@ export default function App() {
                     {selectedProjectDetails.commits * 6} commits
                   </span>
                 </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(28, 1fr)',
-                  gap: '2px',
-                  width: '100%'
-                }}>
-                  {Array.from({ length: 28 * 7 }, (_, idx) => {
-                    const col = Math.floor(idx / 7);
-                    const row = idx % 7;
-                    const commitFactor = Math.max(0.1, Math.min(1.0, (selectedProjectDetails.commits || 1) / 10));
-                    const baseWeight = Math.sin(col * 0.15) * Math.cos(row * 0.4) * 0.45 + 0.45;
-                    const rand = Math.random() * 0.2;
-                    const density = Math.min(1, baseWeight * commitFactor + rand);
-                    
-                    let bg = '#161b22';
-                    let commitsCount = 0;
-                    if (density > 0.75) { bg = '#39d353'; commitsCount = 5 + Math.floor(Math.random() * 4); }
-                    else if (density > 0.5) { bg = '#26a641'; commitsCount = 3 + Math.floor(Math.random() * 2); }
-                    else if (density > 0.25) { bg = '#006d32'; commitsCount = 1 + Math.floor(Math.random() * 2); }
-                    else if (density > 0.1) { bg = '#0e4429'; commitsCount = 1; }
-
-                    // Feature 1: Dynamic tooltips dates generator
-                    const baseDate = new Date();
-                    baseDate.setDate(baseDate.getDate() - (196 - (col * 7 + row)));
-                    const dateStr = baseDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-                    
-                    const mockMessages = [
-                      'refactor: optimize BM25 search queries',
-                      'fix: correct memory bounds in indexing loop',
-                      'feat: integrate language donut visuals',
-                      'docs: update README deployment configurations',
-                      'test: assert rate limit metrics',
-                      'chore: bump dev dependency libraries'
-                    ];
-                    const commitMsg = commitsCount > 0 ? mockMessages[idx % mockMessages.length] : '';
-
-                    return (
-                      <div
-                        key={idx}
-                        className="calendar-square-wrap"
-                        style={{
-                          aspectRatio: '1',
-                          background: bg,
-                          borderRadius: '1px',
-                          position: 'relative',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {/* Hover Tooltip box */}
-                        <div className="calendar-tooltip" style={{
-                          position: 'absolute',
-                          bottom: '120%',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          background: '#161b22',
-                          border: '1px solid var(--border)',
-                          borderRadius: '4px',
-                          padding: '6px 8px',
-                          color: 'var(--text-primary)',
-                          fontSize: '8px',
-                          zIndex: 100,
-                          pointerEvents: 'none',
-                          whiteSpace: 'nowrap',
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                          display: 'none',
-                          lineHeight: '1.2'
-                        }}>
-                          <strong>{dateStr}</strong><br/>
-                          <span style={{ color: 'var(--gh-green)' }}>{commitsCount} commits</span>
-                          {commitsCount > 0 && <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '7.5px', marginTop: '2px', fontStyle: 'italic' }}>"{commitMsg}"</span>}
-                        </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(28, 1fr)',
+                gap: '2px',
+                width: '100%'
+              }}>
+                  {contributionHeatmap.map((cell, idx) => (
+                    <div
+                      key={idx}
+                      className="calendar-square-wrap"
+                      style={{
+                        aspectRatio: '1',
+                        background: cell.bg,
+                        borderRadius: '1px',
+                        position: 'relative',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {/* Hover Tooltip box */}
+                      <div className="calendar-tooltip" style={{
+                        position: 'absolute',
+                        bottom: '120%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: '#161b22',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        padding: '6px 8px',
+                        color: 'var(--text-primary)',
+                        fontSize: '8px',
+                        zIndex: 100,
+                        pointerEvents: 'none',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                        display: 'none',
+                        lineHeight: '1.2'
+                      }}>
+                        <strong>{cell.dateStr}</strong><br/>
+                        <span style={{ color: 'var(--gh-green)' }}>{cell.commitsCount} commits</span>
+                        {cell.commitsCount > 0 && <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '7.5px', marginTop: '2px', fontStyle: 'italic' }}>"{cell.commitMsg}"</span>}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--text-muted)', marginTop: '4px', fontFamily: 'var(--font-mono)', padding: '0 4px' }}>
                   <span>Dec</span>
@@ -3028,6 +3418,12 @@ export default function App() {
               </div>
             </div>
 
+            {/* Project Description */}
+            <div className="inspector-section">
+              <h4>Project Description</h4>
+              <p className="inspector-desc">{selectedProjectDetails.description}</p>
+            </div>
+
             {/* AI Analyst Evaluation Summary */}
             <div className="inspector-section" style={{ borderBottom: '1px solid var(--border)', padding: '16px 20px' }}>
               <div style={{
@@ -3040,7 +3436,7 @@ export default function App() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '12px' }}>🧠</span>
-                  <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--gh-blue)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>AI Observatory Analyst</h4>
+                  <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--gh-blue)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>AI Evidence Analyst</h4>
                 </div>
                 
                 {aiExplainLoading && !aiExplainText[selectedProjectDetails.repo] ? (
@@ -3068,12 +3464,6 @@ export default function App() {
                   </p>
                 )}
               </div>
-            </div>
-
-            {/* Project Description */}
-            <div className="inspector-section">
-              <h4>Project Description</h4>
-              <p className="inspector-desc">{selectedProjectDetails.description}</p>
             </div>
 
             {/* checkmygit-inspired top contributor list */}
@@ -3141,12 +3531,23 @@ export default function App() {
               <div className="inspector-metrics">
                 
                 {/* Score Summary */}
-                <div className="score-hud-block">
+                <div className="score-hud-block" style={{ '--telemetry-signal-color': selectedProjectDetails.telemetrySignal?.color || 'var(--text-primary)' }}>
                   <div>
                     <h4 style={{ textTransform: 'uppercase', fontSize: '0.65rem' }}>Telemetry Rank Score</h4>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Weighted health rank</span>
+                    <span style={{
+                      display: 'inline-flex',
+                      marginTop: '4px',
+                      fontSize: '0.68rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      color: selectedProjectDetails.telemetrySignal?.color || 'var(--text-muted)'
+                    }}>
+                      {selectedProjectDetails.telemetrySignal?.label}
+                    </span>
                   </div>
-                  <span className="score-large">{selectedProjectDetails.score}</span>
+                  <span className="score-large" style={{ color: selectedProjectDetails.telemetrySignal?.color || 'var(--text-primary)' }}>{selectedProjectDetails.score}</span>
                 </div>
 
                 {/* Stars Metric */}
@@ -3244,7 +3645,9 @@ export default function App() {
             </div>
           </>
         )}
-      </aside>
+          </aside>
+        </div>
+      </div>
 
     </div>
   );
