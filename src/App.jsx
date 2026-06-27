@@ -67,14 +67,7 @@ function expandQuery(rawQuery) {
   for (const term of terms) {
     const extras = QUERY_EXPANSIONS[term];
     if (extras) {
-      // Quote multi-word terms (replacing hyphens with spaces for better GitHub matching)
-      const mappedExtras = extras.map(e => {
-        if (e.includes('-')) {
-          return `"${e.replace(/-/g, ' ')}"`;
-        }
-        return e;
-      });
-      clauses.push(`(${term} OR ${mappedExtras.join(' OR ')})`);
+      clauses.push(`(${term} OR ${extras.join(' OR ')})`);
     } else {
       clauses.push(term);
     }
