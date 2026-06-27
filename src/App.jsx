@@ -1145,7 +1145,7 @@ export default function App() {
               maxWidth: '850px',
               fontWeight: 500
             }}>
-              An advanced developer telemetry engine that transforms standard GitHub searches into a real-time semantic matrix. Visualize star velocity trends, active commit frequencies, contribution calendars, and AI-powered health architect summaries in one cohesive deck.
+              Search and evaluate GitHub repositories instantly. Compare star growth speed, recent commit activity, issue resolution rates, and read AI-powered code health summaries to choose the right library for your project.
             </p>
           </div>
           {showGuide && (
