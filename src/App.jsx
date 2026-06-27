@@ -1408,6 +1408,46 @@ export default function App() {
             </div>
           </div>
 
+          {/* ── RADAR CONSOLE LOGS ── */}
+          <div className="hud-panel console-panel" style={{ marginTop: '12px', padding: '12px 14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span className="hud-panel-title" style={{ margin: 0, fontSize: '10px' }}>telemetry radar status</span>
+              {isScanning && (
+                <div className="scanner-active-ping" style={{
+                  width: '8px', height: '8px', borderRadius: '50%', background: 'var(--gh-blue)',
+                  animation: 'pulse 1s infinite'
+                }} />
+              )}
+            </div>
+            <div 
+              ref={consoleRef}
+              style={{
+                background: '#0d1117',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                height: '110px',
+                overflowY: 'auto',
+                padding: '8px 10px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '10px',
+                lineHeight: '1.45',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+              }}
+            >
+              {consoleLogs.map((log, i) => (
+                <div key={i} style={{
+                  color: log.type === 'error' || log.type === 'warn' ? '#ff7b72' : log.type === 'success' ? '#3fb950' : log.type === 'info' ? '#58a6ff' : '#8b949e',
+                  wordBreak: 'break-all'
+                }}>
+                  {log.type === 'success' ? '✓ ' : log.type === 'warn' || log.type === 'error' ? '⚠️ ' : '📡 '}
+                  {log.text}
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Controls Panel */}
           <div className="hud-panel">
             <span className="hud-panel-title">telemetry deck controls</span>
@@ -1667,35 +1707,6 @@ export default function App() {
                   <div className="radar-ring">🔭</div>
                   <h3>No Telemetry Data</h3>
                   <p>Type a query and click Scan to discover project telemetry.</p>
-                </div>
-              )}
-
-              {/* Scan Feed — live log overlay at bottom of matrix */}
-              {(isScanning || consoleLogs.length > 1) && (
-                <div className="scan-feed-overlay" ref={consoleRef}>
-                  <div className="scan-feed-header">
-                    <span className="scan-feed-title">
-                      {isScanning
-                        ? scanProgress.total > 0
-                          ? `⚡ SCANNING — ${scanProgress.done} / ${scanProgress.total} repos enriched`
-                          : '📡 Querying GitHub...'
-                        : '✓ Scan complete'
-                      }
-                    </span>
-                    {isScanning && scanProgress.total > 0 && (
-                      <div className="scan-progress-bar">
-                        <div
-                          className="scan-progress-fill"
-                          style={{ width: `${(scanProgress.done / scanProgress.total) * 100}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div className="scan-feed-log">
-                    {consoleLogs.slice(-3).map((log, i) => (
-                      log ? <span key={i} className={`feed-line ${log.type || ''}`}>{log.text}</span> : null
-                    ))}
-                  </div>
                 </div>
               )}
             </div>
