@@ -1196,7 +1196,7 @@ export default function App() {
                 </h1>
               </div>
               <a 
-                href="https://www.linkedin.com/in/rfankhalid/"
+                href="https://www.linkedin.com/in/irfankhalid/"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
