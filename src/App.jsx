@@ -371,7 +371,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 20;
   const [searchQuery, setSearchQuery] = useState('');
-  const [minStars, setMinStars] = useState(500);
+  const [minStars, setMinStars] = useState(0);
   const [selectedFocus, setSelectedFocus] = useState('All');
   const [selectedQuadrant, setSelectedQuadrant] = useState('All');
   const [selectedLanguage, setSelectedLanguage] = useState('All');
