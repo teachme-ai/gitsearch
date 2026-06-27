@@ -729,11 +729,11 @@ export default function App() {
   const [hasSearched, setHasSearched] = useState(false);
   const [trendingTopics, setTrendingTopics] = useState([]);
 
-  // Fetch trending topics of the last 2 days from GitHub
+  // Fetch trending topics of the last 3 days from GitHub
   useEffect(() => {
     const fetchTrendingTopics = async () => {
       try {
-        const daysAgo = 2;
+        const daysAgo = 3;
         const pastDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
         const dateString = pastDate.toISOString().split('T')[0];
         
@@ -765,11 +765,20 @@ export default function App() {
             'docs', 'guide', 'guides', 'examples', 'example', 'resources', 'resource', 'repo', 'repository'
           ]);
 
+          const isSpamOrUnwanted = (t) => {
+            const unwanted = [
+              'crypto', 'bitcoin', 'btc', 'ethereum', 'eth', 'solana', 'sol', 'nft', 'airdrop', 'claim',
+              'casino', 'gambling', 'betting', 'fake', 'stealer', 'grabber', 'exploit', 'bypass',
+              'crack', 'cheat', 'hack', 'telegram-bot', 'telegrambot', 'telegram', 'leak', 'giveaway', 'free'
+            ];
+            return unwanted.some(kw => t.includes(kw));
+          };
+
           items.forEach(item => {
             if (item.topics && Array.isArray(item.topics)) {
               item.topics.forEach(t => {
                 const cleanT = t.toLowerCase().trim();
-                if (cleanT.length > 2 && !ignoredTopics.has(cleanT)) {
+                if (cleanT.length > 2 && !ignoredTopics.has(cleanT) && !isSpamOrUnwanted(cleanT)) {
                   topicCounts[cleanT] = (topicCounts[cleanT] || 0) + 1;
                 }
               });
