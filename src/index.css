@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ── GitHub dark mode backgrounds ── */
+  --bg-canvas:     #0d1117;
+  --bg-default:    #0d1117;
+  --bg-subtle:     #161b22;
+  --bg-muted:      #1c2128;
+  --bg-overlay:    #21262d;
+  --bg-panel:      rgba(22, 27, 34, 0.95);
+  --bg-card:       #161b22;
+
+  /* ── GitHub borders ── */
+  --border:        #30363d;
+  --border-muted:  #21262d;
+  --border-active: #388bfd;
+
+  /* Legacy aliases (keep components from breaking) */
+  --border-neon:   #30363d;
+  --border-hover:  #58a6ff;
+
+  /* ── GitHub accent colors ── */
+  --gh-blue:   #58a6ff;
+  --gh-green:  #3fb950;
+  --gh-orange: #d29922;
+  --gh-red:    #f85149;
+  --gh-purple: #bc8cff;
+  --gh-cyan:   #39c5cf;
+
+  /* Legacy neon aliases — remapped to GitHub palette */
+  --neon-cyan:          #58a6ff;
+  --neon-cyan-glow:     rgba(88, 166, 255, 0.15);
+  --neon-emerald:       #3fb950;
+  --neon-emerald-glow:  rgba(63, 185, 80, 0.15);
+  --neon-violet:        #bc8cff;
+  --neon-violet-glow:   rgba(188, 140, 255, 0.15);
+  --neon-amber:         #d29922;
+  --neon-amber-glow:    rgba(210, 153, 34, 0.15);
+
+  /* ── GitHub text ── */
+  --text-primary:   #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted:     #6e7681;
+  --text-link:      #58a6ff;
+
+  /* ── Typography — GitHub system stack + JetBrains Mono ── */
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono:    'JetBrains Mono', "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  /* ── Radii — GitHub is conservative ── */
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbars — GitHub style */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-canvas); }
+::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
