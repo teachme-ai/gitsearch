@@ -988,6 +988,7 @@ export default function App() {
           stars: item.stargazers_count,
           forks: item.forks_count,
           starVelocity,
+          starVelocityEffective,
           forkVelocity,
           commits,
           resolution,
@@ -1048,15 +1049,25 @@ export default function App() {
           const bm25Norm  = bm25Scores[i];                         // already [0,1]
           const telNorm   = project.score / maxTel;                // [0,1]
           const fresh     = project.freshnessBoost || 0;          // [0,0.15]
-          // Weighted fusion: semantic 35% + health 50% + freshness 15%
-          const fusionScore = 0.35 * bm25Norm + 0.50 * telNorm + fresh;
+          
+          // Re-rank score: weigh starVelocityEffective heavily (75%) + bm25 semantic match (25%)
+          const maxVelInSet = Math.max(...accumulated.map(p => p.starVelocityEffective || 0), 1e-9);
+          const velNorm = (project.starVelocityEffective || 0) / maxVelInSet;
+          const fusionScore = 0.75 * velNorm + 0.25 * bm25Norm;
+          
           return { ...project, score: project.score, fusionScore, bm25Score: bm25Norm };
         });
 
-        // Sort by fusion score descending
-        fused.sort((a, b) => b.fusionScore - a.fusionScore);
+        // Sort strictly by starVelocityEffective (current growth rate) descending.
+        // If growth velocities are identical, sub-sort by total stars.
+        fused.sort((a, b) => {
+          const diff = (b.starVelocityEffective || 0) - (a.starVelocityEffective || 0);
+          if (Math.abs(diff) > 1e-4) return diff;
+          return b.stars - a.stars;
+        });
+        
         setProjects(fused);
-        log('success', `✨ SCAN COMPLETE. ${fused.length} PROJECTS — BM25 + TELEMETRY FUSION APPLIED.`);
+        log('success', `✨ SCAN COMPLETE. ${fused.length} PROJECTS — GROWTH VELOCITY SORT APPLIED.`);
       } else {
         log('success', `✨ SCAN COMPLETE. ${accumulated.length} PROJECTS ANCHORED.`);
       }
