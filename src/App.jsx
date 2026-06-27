@@ -736,7 +736,7 @@ export default function App() {
     }
     log('info', `Search: "${finalQuery}"`);
 
-    const isProd = import.meta.env.PROD;
+    const isProd = import.meta.env.PROD && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     const searchUrl = isProd
       ? `/api/search?q=${encodeURIComponent(finalQuery)}`
       : `https://api.github.com/search/repositories?q=${encodeURIComponent(finalQuery)}&sort=stars&order=desc&per_page=30`;
@@ -1068,7 +1068,7 @@ export default function App() {
     const repo = selectedProject.repo;
     if (aiExplainText[repo]) return; // already generated
 
-    const isProd = import.meta.env.PROD;
+    const isProd = import.meta.env.PROD && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
     const fetchAIExplanation = async () => {
       setAiExplainLoading(true);
