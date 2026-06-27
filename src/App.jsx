@@ -728,8 +728,87 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const [hasSearched, setHasSearched] = useState(false);
+  const [trendingTopics, setTrendingTopics] = useState([]);
+
+  // Fetch trending topics of the last 4.5 days from GitHub
+  useEffect(() => {
+    const fetchTrendingTopics = async () => {
+      try {
+        const daysAgo = 4.5;
+        const pastDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+        const dateString = pastDate.toISOString().split('T')[0];
+        
+        const token = customToken || localStorage.getItem('TELEMETRY_GITHUB_TOKEN') || '';
+        const headers = {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'GitHub-Repository-Telemetry-HUD'
+        };
+        if (token) headers['Authorization'] = `token ${token}`;
+
+        const isProd = import.meta.env.PROD && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        const url = isProd
+          ? `/api/search?q=created:>${dateString}&sort=stars&order=desc`
+          : `https://api.github.com/search/repositories?q=created:>${dateString}&sort=stars&order=desc&per_page=40`;
+          
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          const items = data.items || [];
+          
+          const topicCounts = {};
+          const ignoredTopics = new Set([
+            'github', 'git', 'open-source', 'hacktoberfest', 'hacktoberfest2026', 'hacktoberfest-2026',
+            'python', 'javascript', 'typescript', 'rust', 'go', 'cpp', 'cplusplus', 'java', 'html', 'css',
+            'react', 'vue', 'angular', 'svelte', 'library', 'framework', 'tool', 'api', 'awesome', 'list',
+            'config', 'dotfiles', 'template', 'boilerplate', 'starter', 'meta', 'app', 'application',
+            'development', 'developer', 'software', 'programming', 'code', 'build', 'project', 'projects',
+            'learning', 'learn', 'education', 'tutorial', 'tutorials', 'course', 'courses', 'documentation',
+            'docs', 'guide', 'guides', 'examples', 'example', 'resources', 'resource', 'repo', 'repository'
+          ]);
+
+          items.forEach(item => {
+            if (item.topics && Array.isArray(item.topics)) {
+              item.topics.forEach(t => {
+                const cleanT = t.toLowerCase().trim();
+                if (cleanT.length > 2 && !ignoredTopics.has(cleanT)) {
+                  topicCounts[cleanT] = (topicCounts[cleanT] || 0) + 1;
+                }
+              });
+            }
+          });
+
+          const sortedTopics = Object.entries(topicCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([topic]) => topic);
+
+          const emojis = ['🔥', '🤖', '⚡', '🧬', '🔭', '📦', '📡', '🛠️'];
+          
+          const suggestionsList = sortedTopics.slice(0, 8).map((topic, index) => {
+            const label = topic
+              .split('-')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+              
+            return {
+              label: `${emojis[index % emojis.length]} ${label}`,
+              query: topic,
+              mode: 'repository'
+            };
+          });
+
+          if (suggestionsList.length > 0) {
+            setTrendingTopics(suggestionsList);
+          }
+        }
+      } catch (err) {
+        // Fallback silently
+      }
+    };
+
+    fetchTrendingTopics();
+  }, [customToken]);
   
-  const suggestions = [
+  const fallbackSuggestions = [
     { label: "💡 How LLMs work", query: "I want to learn how LLM's work.", mode: 'natural' },
     { label: "⚡ KV Cache", query: "about KV Cache", mode: 'natural' },
     { label: "🐰 Bun Framework", query: "I wanna understand how to use bun.", mode: 'natural' },
@@ -737,6 +816,8 @@ export default function App() {
     { label: "🍏 MLX Framework", query: "mlx", mode: 'repository' },
     { label: "📦 PyTorch", query: "pytorch", mode: 'repository' },
   ];
+
+  const suggestions = trendingTopics.length > 0 ? trendingTopics : fallbackSuggestions;
 
   const handleSuggestionClick = (query, mode) => {
     setSearchMode(mode);
