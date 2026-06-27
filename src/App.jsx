@@ -1646,7 +1646,7 @@ export default function App() {
           const starsCount = selectedProject.stars || 0;
           const mockAnalyses = [
             `The ${nameOnly} codebase exhibits strong developmental health with a star velocity of ${vel}★/day. The language structure highlights a robust focus on ${mainLang} optimization. Recommendation: Suitable for core production architecture.`,
-            `Git Observatory telemetry suggests high activity for ${nameOnly}. With ${commitsCount} commits in the last fortnight, the development cycle is fast-paced. Review ${mainLang} memory bounds before production deployment.`,
+            `GitObs telemetry suggests high activity for ${nameOnly}. With ${commitsCount} commits in the last fortnight, the development cycle is fast-paced. Review ${mainLang} memory bounds before production deployment.`,
             `A classic ${mainLang}-based utility stack for ${nameOnly} focused on developer ergonomics. Adopts a modern tech layout and displays high maintainer activity across its ${starsCount} stars. Great for lightweight microservices.`,
             `Experimental or research-grade release of ${nameOnly} with ${starsCount} stars. Star traction is high but commit activity is low. Ideal for research exploration; handle with caution for mission-critical enterprise systems.`
           ];
@@ -1711,7 +1711,7 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <img 
                   src="/logo.jpg" 
-                  alt="Git Observatory Logo" 
+                  alt="GitObs Logo" 
                   style={{
                     width: '42px',
                     height: '42px',
@@ -1727,7 +1727,7 @@ export default function App() {
                   color: 'var(--text-primary)',
                   letterSpacing: '-0.02em'
                 }}>
-                  Git Observatory
+                  GitObs
                 </h1>
               </div>
               <a 
@@ -1945,7 +1945,7 @@ export default function App() {
                 }}
               />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                <span className="app-wordmark-title" style={{ fontSize: '15px', fontWeight: 800 }}>Git Observatory</span>
+                <span className="app-wordmark-title" style={{ fontSize: '15px', fontWeight: 800 }}>GitObs</span>
                 <span className="app-wordmark-sub" style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Real-time repository search &amp; health telemetry</span>
               </div>
             </div>
