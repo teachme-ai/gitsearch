@@ -729,11 +729,11 @@ export default function App() {
   const [hasSearched, setHasSearched] = useState(false);
   const [trendingTopics, setTrendingTopics] = useState([]);
 
-  // Fetch trending topics of the last 4.5 days from GitHub
+  // Fetch trending topics of the last 2 days from GitHub
   useEffect(() => {
     const fetchTrendingTopics = async () => {
       try {
-        const daysAgo = 4.5;
+        const daysAgo = 2;
         const pastDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
         const dateString = pastDate.toISOString().split('T')[0];
         
