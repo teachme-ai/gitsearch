@@ -62,13 +62,24 @@ const QUERY_EXPANSIONS = {
  */
 function expandQuery(rawQuery) {
   const terms = rawQuery.toLowerCase().trim().split(/\s+/);
-  const expanded = [...terms];
+  const clauses = [];
+  
   for (const term of terms) {
     const extras = QUERY_EXPANSIONS[term];
-    if (extras) extras.forEach(e => { if (!expanded.includes(e)) expanded.push(e); });
+    if (extras) {
+      // Quote multi-word terms (replacing hyphens with spaces for better GitHub matching)
+      const mappedExtras = extras.map(e => {
+        if (e.includes('-')) {
+          return `"${e.replace(/-/g, ' ')}"`;
+        }
+        return e;
+      });
+      clauses.push(`(${term} OR ${mappedExtras.join(' OR ')})`);
+    } else {
+      clauses.push(term);
+    }
   }
-  // Cap at 10 terms to stay within GitHub search URL limits
-  return expanded.slice(0, 10).join(' ');
+  return clauses.join(' ');
 }
 
 // ─── BM25+ ENGINE — upgraded from bm25s (xhluca/bm25s) ───────────────────────
