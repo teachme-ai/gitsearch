@@ -697,12 +697,31 @@ export default function App() {
     };
     if (token) headers['Authorization'] = `token ${token}`;
 
-    const targetQuery = overrideQuery !== null ? overrideQuery : searchQuery.trim();
+    let targetQuery = overrideQuery !== null ? overrideQuery : searchQuery.trim();
 
     if (!targetQuery) {
-      log('warn', '🔭 RADAR STANDBY: No search query entered. Type a keyword and trigger the scan.');
+      log('warn', '🔭 RADAR STANDBY: No search query entered. Type a sentence/keyword and trigger the scan.');
       setIsScanning(false);
       return;
+    }
+
+    // ── NLP Sentence Pre-parsing ──
+    if (searchMode === 'natural' && overrideQuery === null) {
+      log('info', `📡 NLP ANALYSIS: Parsing sentence query "${targetQuery}"...`);
+      try {
+        const parseUrl = `/api/parse?q=${encodeURIComponent(targetQuery)}`;
+        const parseRes = await fetch(parseUrl);
+        if (parseRes.ok) {
+          const parseData = await parseRes.json();
+          const keywords = parseData.keywords || targetQuery;
+          log('success', `💡 NLP EXTRACTED TAGS: "${keywords}"`);
+          targetQuery = keywords;
+        } else {
+          log('warn', '⚠️ Serverless NLP parser unavailable. Searching using raw sentence terms.');
+        }
+      } catch (err) {
+        log('warn', `⚠️ NLP extraction error: ${err.message}. Using raw sentence.`);
+      }
     }
 
     // ── Build Query based on Search Mode ──
@@ -1400,13 +1419,38 @@ export default function App() {
                 />
                 Profile ID
               </label>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}>
+                <input
+                  type="radio"
+                  name="searchMode"
+                  value="natural"
+                  checked={searchMode === 'natural'}
+                  onChange={() => setSearchMode('natural')}
+                  style={{ accentColor: 'var(--gh-blue)', margin: 0 }}
+                />
+                💡 Sentence / Idea
+              </label>
             </div>
 
             <div className="search-row">
               <input
                 type="text"
                 className="search-input-primary"
-                placeholder={searchMode === 'profile' ? "e.g. karpathy, torvalds, yyx990803, gaearon..." : "e.g. mlx, llama, diffusion, rust..."}
+                placeholder={
+                  searchMode === 'natural'
+                    ? "e.g. I want to learn how LLMs work..."
+                    : searchMode === 'profile'
+                      ? "e.g. karpathy, torvalds, yyx990803, gaearon..."
+                      : "e.g. mlx, llama, diffusion, rust..."
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
