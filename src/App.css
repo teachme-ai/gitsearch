@@ -107,17 +107,20 @@
   border-bottom: 1px solid var(--border);
 }
 .app-wordmark-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 6px;
+  letter-spacing: -0.01em;
 }
 .app-wordmark-sub {
   font-size: 11px;
   color: var(--text-muted);
-  font-weight: 400;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-top: 2px;
 }
 
 /* ── Search Panel ── */

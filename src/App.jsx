@@ -382,6 +382,11 @@ export default function App() {
   const [aiExplainText, setAiExplainText] = useState({});
   const [aiExplainLoading, setAiExplainLoading] = useState(false);
   
+  // First-time guide visibility
+  const [showGuide, setShowGuide] = useState(() => {
+    return localStorage.getItem('GIT_OBSERVATORY_GUIDE_SEEN') !== 'true';
+  });
+  
   const consoleRef = useRef(null);
 
   // Auto-scroll console logs
@@ -1108,6 +1113,109 @@ export default function App() {
   return (
     <div className="observatory-container">
       
+      {/* Branding Header Block & First-Time Visitor Guide */}
+      <div style={{
+        background: 'var(--bg-subtle)',
+        border: '1px solid var(--border)',
+        borderRadius: '6px',
+        padding: '24px 28px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+          <div>
+            <h1 style={{
+              margin: 0,
+              fontSize: '28px',
+              fontWeight: 850,
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              letterSpacing: '-0.02em'
+            }}>
+              🛰️ Git Observatory
+            </h1>
+            <p style={{
+              margin: '6px 0 0',
+              fontSize: '13.5px',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.5,
+              maxWidth: '850px',
+              fontWeight: 500
+            }}>
+              An advanced developer telemetry engine that transforms standard GitHub searches into a real-time semantic matrix. Visualize star velocity trends, active commit frequencies, contribution calendars, and AI-powered health architect summaries in one cohesive deck.
+            </p>
+          </div>
+          {showGuide && (
+            <button
+              onClick={() => {
+                setShowGuide(false);
+                localStorage.setItem('GIT_OBSERVATORY_GUIDE_SEEN', 'true');
+              }}
+              style={{
+                background: 'rgba(88,166,255,0.1)',
+                border: '1px solid rgba(88,166,255,0.3)',
+                borderRadius: '4px',
+                color: 'var(--gh-blue)',
+                padding: '6px 12px',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                transition: 'all 0.15s ease'
+              }}
+              className="donut-legend-btn"
+            >
+              Dismiss Guide
+            </button>
+          )}
+        </div>
+
+        {showGuide && (
+          <div style={{
+            background: 'var(--bg-canvas)',
+            border: '1px solid var(--border)',
+            borderRadius: '6px',
+            padding: '16px 20px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px'
+          }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(88,166,255,0.15)', color: 'var(--gh-blue)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>1</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Scan Keywords</strong>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Type keywords (e.g. <code>mlx</code>, <code>agent</code>) and hit <strong>Scan</strong> to fetch live telemetries.</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(63,185,80,0.15)', color: 'var(--gh-green)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>2</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Adjust Star Filters</strong>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Drag the stars slider to <code>0</code> to discover emerging libraries (like <code>mynah-ui</code>).</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(210,153,34,0.15)', color: 'var(--gh-orange)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>3</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Inspect Repositories</strong>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Click any card node in the grid to slide open details, commit heatmaps, and AI summaries.</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(139,92,246,0.15)', color: 'var(--neon-violet)', fontSize: '10px', fontWeight: 800, flexShrink: 0 }}>4</span>
+              <div>
+                <strong style={{ display: 'block', fontSize: '12px', color: 'var(--text-primary)', marginBottom: '3px' }}>Authentication</strong>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', lineHeight: '1.4', display: 'block' }}>Add your GitHub Token at the bottom of the sidebar to bypass Search API rate limits.</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Feature 2: Rate Limit Warning Banner */}
       {hasRateLimitError && (
         <div style={{
