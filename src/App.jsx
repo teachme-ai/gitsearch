@@ -1144,18 +1144,43 @@ export default function App() {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h1 style={{
-              margin: 0,
-              fontSize: '28px',
-              fontWeight: 850,
-              color: 'var(--text-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              letterSpacing: '-0.02em'
-            }}>
-              🛰️ Git Observatory
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <h1 style={{
+                margin: 0,
+                fontSize: '28px',
+                fontWeight: 850,
+                color: 'var(--text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                letterSpacing: '-0.02em'
+              }}>
+                🛰️ Git Observatory
+              </h1>
+              <a 
+                href="https://github.com/teachme-ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  background: 'rgba(88,166,255,0.12)',
+                  border: '1px solid rgba(88,166,255,0.3)',
+                  color: 'var(--gh-blue)',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '3px 10px',
+                  borderRadius: '12px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  marginTop: '4px',
+                  transition: 'background 0.15s ease'
+                }}
+                className="created-by-badge"
+              >
+                <span>Created by</span> <strong>teachme.ai</strong>
+              </a>
+            </div>
             <p style={{
               margin: '6px 0 0',
               fontSize: '13.5px',
