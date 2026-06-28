@@ -516,6 +516,20 @@ const createSeededRandom = (seed) => {
   };
 };
 
+const OBSERVABILITY_EVENT_LIMIT = 180;
+const OBSERVABILITY_STORAGE_KEY = 'GITOBS_RUNTIME_EVENTS';
+
+const loadRuntimeEvents = () => {
+  try {
+    const raw = localStorage.getItem(OBSERVABILITY_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, OBSERVABILITY_EVENT_LIMIT) : [];
+  } catch {
+    return [];
+  }
+};
+
 const getTelemetryScoreSignal = (score) => {
   const value = Number(score) || 0;
   if (value >= 120) {
@@ -684,6 +698,12 @@ const PERSONA_PROFILES = {
     priority: 'balanced relevance, adoption, momentum, and maintenance signals',
     weights: { relevance: 0.24, adoption: 0.22, operations: 0.22, momentum: 0.20, ecosystem: 0.12 }
   },
+  learner: {
+    label: 'Learner',
+    audience: 'people learning a topic and looking for clear, teachable repositories',
+    priority: 'starter-friendly explanations, examples, documentation, and structured learning paths',
+    weights: { learning: 0.34, relevance: 0.24, operations: 0.14, novelty: 0.14, ecosystem: 0.08, adoption: 0.06 }
+  },
   ai_builder: {
     label: 'AI Builder',
     audience: 'AI builders and indie technical founders',
@@ -704,7 +724,7 @@ const PERSONA_PROFILES = {
   },
   research_scout: {
     label: 'Research Scout',
-    audience: 'scouts, learners, and ecosystem researchers',
+    audience: 'scouts and ecosystem researchers',
     priority: 'novelty, momentum, and category exploration value',
     weights: { novelty: 0.30, momentum: 0.26, relevance: 0.22, adoption: 0.12, operations: 0.10 }
   }
@@ -802,6 +822,7 @@ const getPersonaFit = (project, personaId = 'explorer') => {
   const forks = Number(project.forks) || 0;
   const ownerFollowers = Number(project.ownerFollowers) || 0;
   const relevance = project.bm25Score !== undefined ? Number(project.bm25Score) : null;
+  const learningText = `${project.repo || ''} ${project.description || ''} ${(project.topics || []).join(' ')}`.toLowerCase();
 
   const signals = {
     adoption: Math.min(100, Math.round((Math.log10(stars + 1) / 5) * 100)),
@@ -811,6 +832,15 @@ const getPersonaFit = (project, personaId = 'explorer') => {
     ecosystem: Math.min(100, Math.round((Math.log10(forks + 1) / 4) * 64 + Math.min(ownerFollowers / 5000, 1) * 36)),
   };
   signals.novelty = Math.max(0, Math.min(100, Math.round(70 + signals.momentum * 0.35 - signals.adoption * 0.45)));
+  signals.learning = Math.max(0, Math.min(100, Math.round(
+    (
+      (/(tutorial|course|guide|handbook|cookbook|walkthrough|learn|learning|docs?|documentation|examples?|starter|template|boilerplate|reference|lab|workshop|playground)/.test(learningText) ? 42 : 0) +
+      (/(how to|getting started|quickstart|quick start|demo|samples?)/.test(learningText) ? 24 : 0) +
+      (/(beginner|beginners|intro|introduction|teach|teaching)/.test(learningText) ? 18 : 0) +
+      (/(awesome|collection|list)/.test(learningText) ? 8 : 0) +
+      (Math.min(project.languageNames?.length || 0, 4) * 4)
+    ) + (relevance !== null ? relevance * 22 : 10) + Math.min(resolution * 18, 18)
+  )));
 
   const fit = Object.entries(persona.weights).reduce((total, [signal, weight]) => {
     return total + (signals[signal] || 0) * weight;
@@ -823,6 +853,111 @@ const getPersonaFit = (project, personaId = 'explorer') => {
     score: Math.round(fit),
     signals
   };
+};
+
+const buildFeynmanExplainSummary = (project) => {
+  const nameOnly = getRepoShortName(project.repo || '');
+  const description = (project.description || '').replace(/\s+/g, ' ').trim();
+  const theme = (project.theme || 'software tooling').toLowerCase();
+  const language = project.primaryLanguage || project.languageNames?.[0]?.name || 'the main stack';
+  const topicText = `${description} ${(project.topics || []).join(' ')} ${theme}`.toLowerCase();
+  const hashSeed = Array.from(String(project.repo || nameOnly)).reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) >>> 0, 0);
+  const pickFrame = (frames) => frames[hashSeed % frames.length];
+
+  const focus = (() => {
+    if (/copilot|assistant|agent|workflow helper|chat|sidebar|panel/i.test(topicText)) {
+      return {
+        role: 'an assistant or workflow layer',
+        audience: 'product teams and developer-tool builders',
+        benefit: 'embed an assistant inside the product without leaving the workflow',
+        closingFrames: [
+          'In practice, it keeps help embedded in the product.',
+          'The experience stays in one place while the user gets guidance.',
+          'It turns the interface into a helper instead of a detour.',
+        ],
+      };
+    }
+    if (/rag|vector|embedding|semantic search|search|retriev|knowledge|llamaindex|haystack/i.test(topicText)) {
+      return {
+        role: 'a retrieval and grounding layer',
+        audience: 'teams building search, Q&A, or knowledge-retrieval systems',
+        benefit: 'ground answers in the most relevant context',
+        closingFrames: [
+          'In practice, it pulls the best source material forward before the model answers.',
+          'The system works by finding context first, then grounding the reply in it.',
+          'It acts like a retrieval layer that narrows the answer space before generation.',
+        ],
+      };
+    }
+    if (/framework|sdk|starter|template|boilerplate|library|plugin|adapter|scaffold/i.test(topicText)) {
+      return {
+        role: 'a reusable foundation',
+        audience: 'developers who need a working base instead of starting from zero',
+        benefit: 'start from a working base instead of rebuilding the same scaffolding',
+        closingFrames: [
+          'In practice, it gives teams a scaffold they can adapt quickly.',
+          'The value is in starting from a working base and swapping in their own pieces.',
+          'It shortens the path from template to shipped feature.',
+        ],
+      };
+    }
+    if (/tutorial|course|guide|learn|learning|example|docs|documentation|workshop|lab|playground/i.test(topicText)) {
+      return {
+        role: 'a learning resource or reference implementation',
+        audience: 'people trying to understand the pattern or teach it to others',
+        benefit: 'understand the pattern faster by seeing it broken into parts',
+        closingFrames: [
+          'In practice, it breaks the pattern into something easier to learn.',
+          'The examples show how the pieces fit before you try the real thing.',
+          'It works like a guided reference you can adapt into your own project.',
+        ],
+      };
+    }
+    if (/logging|telemetry|observability|metrics|trace|monitor|health/i.test(topicText)) {
+      return {
+        role: 'an operational visibility tool',
+        audience: 'teams that need to understand how a system behaves in practice',
+        benefit: 'see how the system behaves and catch issues sooner',
+        closingFrames: [
+          'In practice, it turns raw signals into something operators can act on.',
+          'The point is to collect, compare, and respond before problems spread.',
+          'It helps teams notice drift before it becomes an outage.',
+        ],
+      };
+    }
+    if (/mobile|frontend|ui|react|angular|vue|design system|component/i.test(topicText)) {
+      return {
+        role: 'a UI or product layer',
+        audience: 'teams shipping user-facing interfaces',
+        benefit: 'ship a polished interaction path',
+        closingFrames: [
+          'In practice, it turns state and components into a usable screen flow.',
+          'The main job is to make the interaction feel coherent and usable.',
+          'It helps the product feel like one smooth experience instead of disconnected parts.',
+        ],
+      };
+    }
+    return {
+      role: `${theme} tooling`,
+      audience: `developers working in ${language}`,
+      benefit: 'turn the repository into a repeatable workflow rather than a one-off script',
+      closingFrames: [
+        'In practice, it turns the repository into a repeatable workflow.',
+        'The useful part is that teams can reuse the pattern instead of rethinking it each time.',
+        'It makes the work feel like a process rather than a one-off script.',
+      ],
+    };
+  })();
+
+  const opening = description
+    ? description
+    : `${nameOnly} is ${focus.role}`;
+
+  return [
+    `${nameOnly} is ${opening}.`,
+    `It serves ${focus.audience} and helps them ${focus.benefit}.`,
+    pickFrame(focus.closingFrames),
+  ].join(' ');
 };
 
 const buildRepositoryCard = (project, personaId = 'explorer') => {
@@ -915,6 +1050,7 @@ const buildRepositoryCard = (project, personaId = 'explorer') => {
     scorecard: {
       adoption: personaFit.signals.adoption,
       operations: personaFit.signals.operations,
+      learning: personaFit.signals.learning,
       fit: personaFit.score,
       influence: lineage.score,
     }
@@ -942,6 +1078,7 @@ export default function App() {
   const [hasRateLimitError, setHasRateLimitError] = useState(false);
   const [gatekeeperState, setGatekeeperState] = useState(() => readUniversalGatekeeperState());
   const [gateClock, setGateClock] = useState(() => Date.now());
+  const [runtimeEvents, setRuntimeEvents] = useState(() => loadRuntimeEvents());
 
   // Scanner states
   const [isScanning, setIsScanning] = useState(false);
@@ -1141,6 +1278,17 @@ export default function App() {
       // Ignore storage failures.
     }
   }, [gatekeeperState]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        OBSERVABILITY_STORAGE_KEY,
+        JSON.stringify(runtimeEvents.slice(0, OBSERVABILITY_EVENT_LIMIT))
+      );
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [runtimeEvents]);
   
   const fallbackSuggestions = [
     { label: "💡 How LLMs work", query: "I want to learn how LLM's work.", mode: 'natural' },
@@ -1188,10 +1336,38 @@ export default function App() {
   const handleSuggestionClick = (query, mode) => {
     setSearchMode(mode || 'repository');
     setSearchQuery(query);
+    pushConsoleLog('info', `💡 Suggested search loaded: ${query}`, {
+      event: 'suggestion_click',
+      mode: mode || 'repository',
+      query,
+    });
     performGitHubSearch(query);
   };
 
   const consoleRef = useRef(null);
+
+  const recordRuntimeEvent = (kind, message, meta = {}) => {
+    const event = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      ts: Date.now(),
+      kind,
+      message,
+      meta,
+    };
+
+    setRuntimeEvents(prev => [event, ...prev].slice(0, OBSERVABILITY_EVENT_LIMIT));
+
+    if (import.meta.env.DEV) {
+      console.info('[GitObs]', kind, message, meta);
+    }
+
+    return event;
+  };
+
+  const pushConsoleLog = (type, text, meta = {}) => {
+    setConsoleLogs(prev => [...prev, { type, text, meta }]);
+    recordRuntimeEvent(type, text, meta);
+  };
 
   // Auto-scroll console logs
   useEffect(() => {
@@ -1448,7 +1624,10 @@ export default function App() {
     const candidate = projects.find(p => p.repo === repoName);
     if (!candidate) return;
 
-    setConsoleLogs(prev => [...prev, { type: 'info', text: `🔄 Re-fetching live profile metrics for ${repoName}...` }]);
+    pushConsoleLog('info', `🔄 Re-fetching live profile metrics for ${repoName}...`, {
+      event: 'project_refresh_start',
+      repo: repoName,
+    });
     
     const token = customToken || '';
     const headers = {
@@ -1486,26 +1665,43 @@ export default function App() {
         setSelectedProject({ ...selectedProject, ...refreshed });
       }
 
-      setConsoleLogs(prev => [...prev, { type: 'success', text: `✓ Refreshed stack profile for ${repoName}!` }]);
+      pushConsoleLog('success', `✓ Refreshed stack profile for ${repoName}!`, {
+        event: 'project_refresh_complete',
+        repo: repoName,
+      });
     } catch (e) {
-      setConsoleLogs(prev => [...prev, { type: 'warn', text: `❌ Refresh failed: ${e.message}` }]);
+      pushConsoleLog('warn', `❌ Refresh failed: ${e.message}`, {
+        event: 'project_refresh_failed',
+        repo: repoName,
+      });
     }
   };
 
   const performGitHubSearch = async (overrideQuery = null) => {
     if (isScanning) return;
 
-    const log = (type, text) => {
-      setConsoleLogs(prev => [...prev, { type, text }]);
+    const log = (type, text, meta = {}) => {
+      pushConsoleLog(type, text, meta);
     };
 
     const token = customToken || '';
+    const scanStartedAt = Date.now();
 
-    log('cyan-text', '📡 INITIALIZING REAL-TIME REPOSITORY TELEMETRY SCAN...');
+    log('cyan-text', '📡 INITIALIZING REAL-TIME REPOSITORY TELEMETRY SCAN...', {
+      event: 'scan_start',
+      mode: searchMode,
+      persona: selectedPersona,
+    });
     if (token) {
-      log('success', `🔐 AUTHENTICATED SCAN SECURED via GITHUB_TOKEN (${token.substring(0, 4)}...${token.substring(token.length - 4)}).`);
+      log('success', `🔐 AUTHENTICATED SCAN SECURED via GITHUB_TOKEN (${token.substring(0, 4)}...${token.substring(token.length - 4)}).`, {
+        event: 'auth_mode',
+        mode: 'authenticated',
+      });
     } else {
-      log('warn', '⚠️ WARNING: Running scan unauthenticated. API rate limits may apply.');
+      log('warn', '⚠️ WARNING: Running scan unauthenticated. API rate limits may apply.', {
+        event: 'auth_mode',
+        mode: 'unauthenticated',
+      });
     }
 
     const headers = {
@@ -1517,17 +1713,22 @@ export default function App() {
     let targetQuery = overrideQuery !== null ? overrideQuery : searchQuery.trim();
 
     if (!targetQuery) {
-      log('warn', '🔭 RADAR STANDBY: No search query entered. Type a sentence/keyword and trigger the scan.');
+      log('warn', '🔭 RADAR STANDBY: No search query entered. Type a sentence/keyword and trigger the scan.', {
+        event: 'scan_blocked',
+        reason: 'empty_query',
+      });
       setIsScanning(false);
       return;
     }
 
     const gateSnapshot = getUniversalGatekeeperSnapshot(gatekeeperState, Boolean(customToken));
     if (gateSnapshot.blocked) {
-      log(
-        'warn',
-        `🛑 Universal Gatekeeper: free scans are capped at ${gateSnapshot.limit} launch${gateSnapshot.limit === 1 ? '' : 'es'} per ${Math.round(gateSnapshot.windowMs / 1000)}s. Used ${gateSnapshot.used}/${gateSnapshot.limit}. Wait ${formatCountdown(gateSnapshot.waitMs)} before trying again.`
-      );
+      log('warn', `🛑 Universal Gatekeeper: free scans are capped at ${gateSnapshot.limit} launch${gateSnapshot.limit === 1 ? '' : 'es'} per ${Math.round(gateSnapshot.windowMs / 1000)}s. Used ${gateSnapshot.used}/${gateSnapshot.limit}. Wait ${formatCountdown(gateSnapshot.waitMs)} before trying again.`, {
+        event: 'gatekeeper_blocked',
+        used: gateSnapshot.used,
+        limit: gateSnapshot.limit,
+        waitMs: gateSnapshot.waitMs,
+      });
       setIsScanning(false);
       return;
     }
@@ -1535,10 +1736,12 @@ export default function App() {
     const gateReservation = reserveUniversalGatekeeperSlot();
     if (!gateReservation.allowed) {
       const blocked = gateReservation.snapshot;
-      log(
-        'warn',
-        `🛑 Universal Gatekeeper: free scans are capped at ${blocked.limit} launch${blocked.limit === 1 ? '' : 'es'} per ${Math.round(blocked.windowMs / 1000)}s. Used ${blocked.used}/${blocked.limit}. Wait ${formatCountdown(blocked.waitMs)} before trying again.`
-      );
+      log('warn', `🛑 Universal Gatekeeper: free scans are capped at ${blocked.limit} launch${blocked.limit === 1 ? '' : 'es'} per ${Math.round(blocked.windowMs / 1000)}s. Used ${blocked.used}/${blocked.limit}. Wait ${formatCountdown(blocked.waitMs)} before trying again.`, {
+        event: 'gatekeeper_blocked',
+        used: blocked.used,
+        limit: blocked.limit,
+        waitMs: blocked.waitMs,
+      });
       setIsScanning(false);
       return;
     }
@@ -1562,7 +1765,10 @@ export default function App() {
 
     // ── NLP Sentence Pre-parsing ──
     if (searchMode === 'natural' && overrideQuery === null) {
-      log('info', `📡 NLP ANALYSIS: Parsing sentence query "${targetQuery}"...`);
+      log('info', `📡 NLP ANALYSIS: Parsing sentence query "${targetQuery}"...`, {
+        event: 'query_parse_start',
+        query: targetQuery,
+      });
       
       const clientSideFallback = (query) => {
         const stopWords = new Set([
@@ -1584,16 +1790,25 @@ export default function App() {
         if (parseRes.ok) {
           const parseData = await parseRes.json();
           const keywords = parseData.keywords || targetQuery;
-          log('success', `💡 NLP EXTRACTED TAGS: "${keywords}"`);
+          log('success', `💡 NLP EXTRACTED TAGS: "${keywords}"`, {
+            event: 'query_parse_success',
+            keywords,
+          });
           targetQuery = keywords;
         } else {
           const keywords = clientSideFallback(targetQuery);
-          log('success', `💡 CLIENT-SIDE NLP FALLBACK EXTRACTED: "${keywords}"`);
+          log('success', `💡 CLIENT-SIDE NLP FALLBACK EXTRACTED: "${keywords}"`, {
+            event: 'query_parse_fallback',
+            keywords,
+          });
           targetQuery = keywords;
         }
       } catch (err) {
         const keywords = clientSideFallback(targetQuery);
-        log('success', `💡 CLIENT-SIDE NLP FALLBACK EXTRACTED: "${keywords}"`);
+        log('success', `💡 CLIENT-SIDE NLP FALLBACK EXTRACTED: "${keywords}"`, {
+          event: 'query_parse_fallback',
+          keywords,
+        });
         targetQuery = keywords;
       }
     }
@@ -1617,7 +1832,12 @@ export default function App() {
       const langClauses = selectedLanguages.map(lang => `language:${lang}`).join(' OR ');
       finalQuery += ` (${langClauses})`;
     }
-    log('info', `Search: "${finalQuery}"`);
+    log('info', `Search: "${finalQuery}"`, {
+      event: 'query_built',
+      query: finalQuery,
+      minStars,
+      languages: selectedLanguages.length,
+    });
 
     const isProd = import.meta.env.PROD && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     setHasRateLimitError(false);
@@ -1626,8 +1846,20 @@ export default function App() {
       const searchUrl = isProd
         ? `/api/search?q=${encodeURIComponent(query)}`
         : `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&per_page=30`;
-      log('info', label || (isProd ? '🛰️ Querying GitDeck Secure API Proxy...' : '🛰️ Querying GitHub Search API...'));
+      const requestStartedAt = Date.now();
+      log('info', label || (isProd ? '🛰️ Querying GitDeck Secure API Proxy...' : '🛰️ Querying GitHub Search API...'), {
+        event: 'search_request',
+        source: isProd ? 'proxy' : 'github',
+        query,
+      });
       const response = await fetch(searchUrl, { headers });
+      recordRuntimeEvent('search_response', 'Search response received', {
+        event: 'search_response',
+        source: isProd ? 'proxy' : 'github',
+        query,
+        status: response.status,
+        durationMs: Date.now() - requestStartedAt,
+      });
       if (!response.ok) {
         if (response.status === 403 || response.status === 429) {
           const retryAfter = Number(response.headers.get('retry-after')) * 1000 || 0;
@@ -1639,15 +1871,19 @@ export default function App() {
               : UNIVERSAL_GATEKEEPER_WINDOW_MS;
 
           applyUniversalGatekeeperCooldown(waitMs, `GitHub responded with ${response.status}`);
-          log(
-            'warn',
-            `⚠️ GitHub API rate limit triggered (${response.status}). Hold for ${formatCountdown(waitMs)} before the next scan.`
-          );
+          log('warn', `⚠️ GitHub API rate limit triggered (${response.status}). Hold for ${formatCountdown(waitMs)} before the next scan.`, {
+            event: 'rate_limit',
+            status: response.status,
+            waitMs,
+          });
           setHasRateLimitError(true);
           return null;
         }
         if (response.status === 422) {
-          log('warn', '⚠️ GitHub rejected the search syntax. Falling back to a simpler query.');
+          log('warn', '⚠️ GitHub rejected the search syntax. Falling back to a simpler query.', {
+            event: 'search_syntax_rejected',
+            status: response.status,
+          });
           return [];
         }
         throw new Error(`API status ${response.status}`);
@@ -1683,13 +1919,20 @@ export default function App() {
       if (items.length === 0 && searchMode !== 'profile') {
         const recoveryQuery = buildRecoverySearchQuery(targetQuery);
         if (recoveryQuery && recoveryQuery !== finalQuery) {
-          log('warn', `⚠️ Primary query was too narrow. Retrying with a broader recovery query.`);
+          log('warn', `⚠️ Primary query was too narrow. Retrying with a broader recovery query.`, {
+            event: 'search_recovery',
+            query: recoveryQuery,
+          });
           finalQuery = recoveryQuery;
           usedRecoveryQuery = true;
           items = await fetchSearchItems(finalQuery, '🛰️ Querying recovery semantic search...');
         }
       }
-      log('success', `✓ Discovered ${items.length} repositories${usedRecoveryQuery ? ' via recovery query' : ''}.`);
+      log('success', `✓ Discovered ${items.length} repositories${usedRecoveryQuery ? ' via recovery query' : ''}.`, {
+        event: 'search_discovery',
+        count: items.length,
+        recovery: usedRecoveryQuery,
+      });
 
       if (items.length === 0) {
         if (searchMode !== 'profile') {
@@ -1704,21 +1947,31 @@ export default function App() {
               broadenedQuery += ` (${langClauses})`;
             }
 
-            log('info', `📡 Sparse hit count (${items.length}). Broadening semantic net for "${targetQuery}"...`);
+            log('info', `📡 Sparse hit count (${items.length}). Broadening semantic net for "${targetQuery}"...`, {
+              event: 'search_broaden',
+              count: items.length,
+            });
             const broadenedItems = await fetchSearchItems(
               broadenedQuery,
               '🛰️ Querying broadened semantic search...'
             );
             if (broadenedItems && broadenedItems.length > 0) {
               items = mergeUniqueItems([items, broadenedItems]);
-              log('success', `✓ Broadened discovery to ${items.length} unique repositories.`);
+              log('success', `✓ Broadened discovery to ${items.length} unique repositories.`, {
+                event: 'search_broaden_success',
+                count: items.length,
+              });
               usedBroadenedQuery = true;
             }
           }
         }
 
         if (items.length === 0) {
-          log('warn', `🔭 No repositories found matching "${targetQuery}" with stars > ${minStars}. Try lowering the "Min Stars Threshold" slider in the sidebar!`);
+          log('warn', `🔭 No repositories found matching "${targetQuery}" with stars > ${minStars}. Try lowering the "Min Stars Threshold" slider in the sidebar!`, {
+            event: 'no_results',
+            query: targetQuery,
+            minStars,
+          });
           setIsScanning(false);
           return;
         }
@@ -1737,14 +1990,20 @@ export default function App() {
             broadenedQuery += ` (${langClauses})`;
           }
 
-          log('info', `📡 Sparse hit count (${items.length}). Broadening semantic net for "${targetQuery}"...`);
+          log('info', `📡 Sparse hit count (${items.length}). Broadening semantic net for "${targetQuery}"...`, {
+            event: 'search_broaden',
+            count: items.length,
+          });
           const broadenedItems = await fetchSearchItems(
             broadenedQuery,
             '🛰️ Querying broadened semantic search...'
           );
           if (broadenedItems && broadenedItems.length > 0) {
             searchResults = mergeUniqueItems([items, broadenedItems]);
-            log('success', `✓ Broadened discovery to ${searchResults.length} unique repositories.`);
+            log('success', `✓ Broadened discovery to ${searchResults.length} unique repositories.`, {
+              event: 'search_broaden_success',
+              count: searchResults.length,
+            });
             usedBroadenedQuery = true;
           }
         }
@@ -1763,7 +2022,10 @@ export default function App() {
       }
 
       setScanProgress({ done: 0, total: uniqueCandidates.length });
-      log('cyan-text', `⚡ Enriching ${uniqueCandidates.length} repos in parallel batches...`);
+      log('cyan-text', `⚡ Enriching ${uniqueCandidates.length} repos in parallel batches...`, {
+        event: 'enrich_start',
+        count: uniqueCandidates.length,
+      });
 
       // ── Helper: enrich one repo (commits + resolution) concurrently ──
       const enrichRepo = async (item) => {
@@ -1779,6 +2041,9 @@ export default function App() {
             // we bypass the cache to try fetching the complete breakdown again.
             const isFallbackData = cached.data?.languageNames?.length === 1 && cached.data.languageNames[0].pct === 1.0;
             if (isFresh && !isFallbackData) {
+              recordRuntimeEvent('enrich_cache_hit', 'Using cached enrichment payload', {
+                repo: item.full_name,
+              });
               return { ...cached.data };
             }
           }
@@ -1809,6 +2074,11 @@ export default function App() {
             const enrichRes = await fetch(`/api/enrich?repo=${encodeURIComponent(item.full_name)}`);
             if (enrichRes.ok) {
               const resData = await enrichRes.json();
+              recordRuntimeEvent('enrich_proxy_success', 'Production enrichment proxy responded', {
+                repo: item.full_name,
+                commits: resData.commits || 0,
+                resolution: resData.resolution || 0.5,
+              });
               commits = resData.commits || 0;
               resolution = resData.resolution || 0.5;
               languageBytes = resData.languageBytes || {};
@@ -1820,6 +2090,11 @@ export default function App() {
               }));
               ownerPublicRepos = resData.ownerPublicRepos || 0;
               ownerFollowers = resData.ownerFollowers || 0;
+            } else {
+              recordRuntimeEvent('enrich_proxy_fallback', 'Production enrichment proxy missed and fallback data will be synthesized', {
+                repo: item.full_name,
+                status: enrichRes.status,
+              });
             }
           } else {
             // ── Local Development direct GitHub calls ──
@@ -1865,6 +2140,11 @@ export default function App() {
               ownerPublicRepos = u.public_repos || 0;
               ownerFollowers = u.followers || 0;
             }
+            recordRuntimeEvent('enrich_direct_complete', 'Direct GitHub enrichment completed', {
+              repo: item.full_name,
+              commits,
+              resolution: Number(resolution).toFixed(2),
+            });
           }
 
           // Format language percentage lists
@@ -1879,6 +2159,9 @@ export default function App() {
           }
         } catch (err) {
           console.warn(`Rate limit or network block enrichment fallback active for ${item.full_name}`);
+          recordRuntimeEvent('enrich_fallback', 'Enrichment fell back to synthesized data', {
+            repo: item.full_name,
+          });
         }
 
         // Apply primary language defaults + mock additional languages if rate limits prevented fetch
@@ -2021,7 +2304,12 @@ export default function App() {
         // Progressive update — UI refreshes after every batch
         setProjects([...accumulated]);
         setScanProgress({ done: accumulated.length, total: uniqueCandidates.length });
-        log('success', `  ✓ Batch ${batchNum} complete. ${accumulated.length}/${uniqueCandidates.length} repos live.`);
+        log('success', `  ✓ Batch ${batchNum} complete. ${accumulated.length}/${uniqueCandidates.length} repos live.`, {
+          event: 'enrich_batch_complete',
+          batch: batchNum,
+          done: accumulated.length,
+          total: uniqueCandidates.length,
+        });
       }
 
       // ── BM25 Fusion Re-rank — runs once after all batches complete ──
@@ -2056,12 +2344,23 @@ export default function App() {
         });
         
         setProjects(fused);
-        log('success', `✨ SCAN COMPLETE. ${fused.length} PROJECTS — SEMANTIC FUSION SORT APPLIED.`);
+        log('success', `✨ SCAN COMPLETE. ${fused.length} PROJECTS — SEMANTIC FUSION SORT APPLIED.`, {
+          event: 'scan_complete',
+          count: fused.length,
+          durationMs: Date.now() - scanStartedAt,
+        });
       } else {
-        log('success', `✨ SCAN COMPLETE. ${accumulated.length} PROJECTS ANCHORED.`);
+        log('success', `✨ SCAN COMPLETE. ${accumulated.length} PROJECTS ANCHORED.`, {
+          event: 'scan_complete',
+          count: accumulated.length,
+          durationMs: Date.now() - scanStartedAt,
+        });
       }
     } catch (err) {
-      log('warn', `❌ Error during search sweep: ${err.message}`);
+      log('warn', `❌ Error during search sweep: ${err.message}`, {
+        event: 'scan_failed',
+        error: err.message,
+      });
     }
 
     setIsScanning(false);
@@ -2074,45 +2373,104 @@ export default function App() {
   useEffect(() => {
     if (!selectedProject) return;
     const repo = selectedProject.repo;
-    if (aiExplainText[repo]) return; // already generated
+    if (aiExplainText[repo]) {
+      pushConsoleLog('info', `🧠 Reusing cached AI analyst summary for ${repo}.`, {
+        event: 'ai_explain_cache_hit',
+        repo,
+      });
+      return; // already generated
+    }
 
     const isProd = import.meta.env.PROD && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
 
     const fetchAIExplanation = async () => {
       setAiExplainLoading(true);
       try {
+        const explainStartedAt = Date.now();
         const vel = selectedProject.starVelocity ? Number(selectedProject.starVelocity).toFixed(1) : '0';
         const commitsCount = selectedProject.commits || 0;
+          recordRuntimeEvent('ai_explain_prepare', 'Preparing repository review context', {
+            repo,
+            mode: isProd ? 'prod' : 'local',
+            descLength: (selectedProject.description || '').length,
+            hasReadmeContext: Boolean(selectedProject.description),
+            stars: selectedProject.stars || 0,
+            commits: commitsCount,
+          });
         
         if (isProd) {
           const url = `/api/explain?repo=${encodeURIComponent(repo)}&desc=${encodeURIComponent(selectedProject.description || '')}&lang=${encodeURIComponent(selectedProject.primaryLanguage || '')}&stars=${selectedProject.stars || 0}&commits=${commitsCount}&velocity=${vel}`;
+          pushConsoleLog('info', `🧠 Requesting AI analyst review for ${repo}...`, {
+            event: 'ai_explain_start',
+            repo,
+            mode: 'prod',
+          });
           const res = await fetch(url);
           if (res.ok) {
             const data = await res.json();
             setAiExplainText(prev => ({ ...prev, [repo]: data.summary }));
+            recordRuntimeEvent('ai_explain_success', 'AI analyst summary returned', {
+              repo,
+              durationMs: Date.now() - explainStartedAt,
+              mode: 'prod',
+              context: data.evidence ? {
+                headings: data.evidence.readmeHeadings?.length || 0,
+                bullets: data.evidence.readmeBullets?.length || 0,
+              } : null,
+            });
+            if (data.evidence) {
+              pushConsoleLog('info', `📚 README context extracted for ${repo}.`, {
+                event: 'ai_explain_context',
+                repo,
+                headings: data.evidence.readmeHeadings?.length || 0,
+                bullets: data.evidence.readmeBullets?.length || 0,
+              });
+            }
           } else {
-            setAiExplainText(prev => ({ ...prev, [repo]: 'AI analyst currently offline. Please check your API key configurations.' }));
+            const statusMessage = res.status === 404
+              ? 'Production AI API route not found. Check that your host is deploying the serverless /api/explain function.'
+              : res.status === 401 || res.status === 403
+                ? 'AI analyst unavailable. Check production API credentials and deployment secrets.'
+                : res.status === 429
+                  ? 'AI analyst rate-limited on the production API. Try again after the quota window resets.'
+                  : 'AI analyst currently offline in production. Please check API key and host configuration.';
+            setAiExplainText(prev => ({ ...prev, [repo]: statusMessage }));
+            recordRuntimeEvent('ai_explain_fallback', 'AI analyst summary fell back to offline text', {
+              repo,
+              status: res.status,
+              statusText: res.statusText,
+              mode: 'prod',
+            });
+            pushConsoleLog('warn', `⚠️ AI analyst production request failed for ${repo} (${res.status} ${res.statusText}).`, {
+              event: 'ai_explain_fallback',
+              repo,
+              status: res.status,
+              statusText: res.statusText,
+              mode: 'prod',
+            });
           }
         } else {
           // Local Development Mock generator: dynamically construct a unique, highly specific analysis
           await new Promise(r => setTimeout(r, 450));
-          const nameOnly = repo.split('/').pop() || repo;
-          const mainLang = selectedProject.primaryLanguage || 'JavaScript';
-          const starsCount = selectedProject.stars || 0;
-          const mockAnalyses = [
-            `The ${nameOnly} codebase exhibits strong developmental health with a star velocity of ${vel}★/day. The language structure highlights a robust focus on ${mainLang} optimization. Recommendation: Suitable for core production architecture.`,
-            `GitObs telemetry suggests high activity for ${nameOnly}. With ${commitsCount} commits in the last fortnight, the development cycle is fast-paced. Review ${mainLang} memory bounds before production deployment.`,
-            `A classic ${mainLang}-based utility stack for ${nameOnly} focused on developer ergonomics. Adopts a modern tech layout and displays high maintainer activity across its ${starsCount} stars. Great for lightweight microservices.`,
-            `Experimental or research-grade release of ${nameOnly} with ${starsCount} stars. Star traction is high but commit activity is low. Ideal for research exploration; handle with caution for mission-critical enterprise systems.`
-          ];
-          
-          // Generate a more unique hash from the string characters to distribute indices better
-          const charSum = repo.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-          const index = charSum % mockAnalyses.length;
-          setAiExplainText(prev => ({ ...prev, [repo]: mockAnalyses[index] }));
+          const summary = buildFeynmanExplainSummary(selectedProject);
+          setAiExplainText(prev => ({ ...prev, [repo]: summary }));
+          recordRuntimeEvent('ai_explain_success', 'Local AI analyst summary generated', {
+            repo,
+            durationMs: Date.now() - explainStartedAt,
+            mode: 'local',
+          });
         }
       } catch (e) {
-        setAiExplainText(prev => ({ ...prev, [repo]: 'Failed to retrieve AI evaluation summary.' }));
+        setAiExplainText(prev => ({ ...prev, [repo]: 'Failed to reach the AI analyst service. This usually means the production backend is unavailable.' }));
+        recordRuntimeEvent('ai_explain_failed', 'AI analyst summary failed', {
+          repo,
+          error: e.message,
+        });
+        pushConsoleLog('error', `❌ AI analyst request failed for ${repo}: ${e.message}`, {
+          event: 'ai_explain_failed',
+          repo,
+          error: e.message,
+        });
       } finally {
         setAiExplainLoading(false);
       }
@@ -2571,6 +2929,28 @@ export default function App() {
                 }}>
                   {log.type === 'success' ? '✓ ' : log.type === 'warn' || log.type === 'error' ? '⚠️ ' : '📡 '}
                   {log.text}
+                  {log.meta && Object.keys(log.meta).length > 0 && (
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '4px',
+                      marginTop: '2px',
+                      color: 'var(--text-muted)',
+                      fontSize: '8.5px',
+                      lineHeight: 1.3
+                    }}>
+                      {Object.entries(log.meta).slice(0, 4).map(([key, value]) => (
+                        <span key={key} style={{
+                          padding: '1px 4px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '999px',
+                          background: 'rgba(255,255,255,0.02)'
+                        }}>
+                          {key}: {String(value)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2587,7 +2967,13 @@ export default function App() {
                   <button
                     key={personaId}
                     className={`persona-btn ${selectedPersona === personaId ? 'active' : ''}`}
-                    onClick={() => setSelectedPersona(personaId)}
+                    onClick={() => {
+                      setSelectedPersona(personaId);
+                      pushConsoleLog('info', `🧭 Persona switched to ${persona.label}`, {
+                        event: 'persona_change',
+                        persona: personaId,
+                      });
+                    }}
                     title={persona.priority}
                   >
                     <span>{persona.label}</span>
@@ -2602,13 +2988,25 @@ export default function App() {
                 <div className="filter-pills">
                   <button
                     className={`filter-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                    onClick={() => setViewMode('grid')}
+                    onClick={() => {
+                      setViewMode('grid');
+                      pushConsoleLog('info', '🖼️ View mode set to Grid View', {
+                        event: 'view_mode_change',
+                        viewMode: 'grid',
+                      });
+                    }}
                   >
                     田 Grid View
                   </button>
                   <button
                     className={`filter-btn ${viewMode === 'map' ? 'active' : ''}`}
-                    onClick={() => setViewMode('map')}
+                    onClick={() => {
+                      setViewMode('map');
+                      pushConsoleLog('info', '🖼️ View mode set to Matrix View', {
+                        event: 'view_mode_change',
+                        viewMode: 'map',
+                      });
+                    }}
                   >
                     ◰ Matrix View
                   </button>
@@ -2624,7 +3022,13 @@ export default function App() {
                   <button
                     key={focus}
                     className={`filter-btn ${selectedFocus === focus ? 'active' : ''}`}
-                    onClick={() => setSelectedFocus(focus)}
+                    onClick={() => {
+                      setSelectedFocus(focus);
+                      pushConsoleLog('info', `🏷️ Ownership filter set to ${focus}`, {
+                        event: 'ownership_filter_change',
+                        value: focus,
+                      });
+                    }}
                   >
                     {focus}
                   </button>
@@ -2640,7 +3044,13 @@ export default function App() {
                   <button
                     key={sector}
                     className={`filter-btn ${selectedQuadrant === sector ? 'active' : ''}`}
-                    onClick={() => setSelectedQuadrant(sector)}
+                    onClick={() => {
+                      setSelectedQuadrant(sector);
+                      pushConsoleLog('info', `🧭 Activity sector set to ${sector}`, {
+                        event: 'sector_filter_change',
+                        value: sector,
+                      });
+                    }}
                     style={{ fontSize: '0.72rem', padding: '6px 12px' }}
                   >
                     {sector}
@@ -2661,7 +3071,13 @@ export default function App() {
                 type="range"
                 min="0" max="10000" step="50"
                 value={minStars}
-                onChange={e => setMinStars(Number(e.target.value))}
+                onChange={e => {
+                  const nextMin = Number(e.target.value);
+                  setMinStars(nextMin);
+                  recordRuntimeEvent('stars_threshold_change', 'Minimum stars threshold adjusted', {
+                    value: nextMin,
+                  });
+                }}
                 className="stars-slider"
               />
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2676,7 +3092,12 @@ export default function App() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 <button
                   className={`filter-btn ${selectedLanguages.length === 0 ? 'active' : ''}`}
-                  onClick={() => setSelectedLanguages([])}
+                  onClick={() => {
+                    setSelectedLanguages([]);
+                    pushConsoleLog('info', '🧵 Language filter cleared', {
+                      event: 'language_filter_clear',
+                    });
+                  }}
                   style={{ fontSize: '0.72rem', padding: '5px 10px' }}
                 >
                   All
@@ -2694,6 +3115,9 @@ export default function App() {
                           } else {
                             return [...prev, lang];
                           }
+                        });
+                        recordRuntimeEvent('language_filter_toggle', 'Language filter toggled', {
+                          language: lang,
                         });
                       }}
                       style={{ fontSize: '0.72rem', padding: '5px 10px' }}
@@ -2946,6 +3370,12 @@ export default function App() {
                     style={{ '--focus-color': styles.color, '--focus-glow': styles.glow }}
                     onClick={() => {
                       setSelectedProject(prev => prev?.repo === project.repo ? null : project);
+                      pushConsoleLog('info', `🗂️ Repository selected: ${project.repo}`, {
+                        event: 'repo_selected',
+                        repo: project.repo,
+                        focus: project.focus,
+                        theme: project.theme,
+                      });
                       if (isMobile) setSidebarOpen(false);
                     }}
                   >
@@ -3417,6 +3847,40 @@ export default function App() {
               </div>
             </div>
 
+            <div className="inspector-section">
+              <h4>Evaluation Lens</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
+                  <span className={`status-badge ${selectedPersona === 'learner' ? 'nova' : selectedPersona === 'research_scout' ? 'pulsar' : 'supernova'}`} style={{ alignSelf: 'flex-start' }}>
+                    {selectedProjectDetails.repositoryCard?.persona_label || 'Explorer'}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Fit {selectedProjectDetails.repositoryCard?.persona_fit || 0}
+                  </span>
+                </div>
+                <p className="inspector-desc" style={{ fontSize: '0.8rem', margin: 0 }}>
+                  {selectedProjectDetails.repositoryCard?.best_for || 'Balanced repository discovery.'}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
+                    <span>Learning signal</span>
+                    <span style={{ color: (selectedProjectDetails.repositoryCard?.scorecard?.learning || 0) > 70 ? 'var(--gh-green)' : (selectedProjectDetails.repositoryCard?.scorecard?.learning || 0) > 40 ? 'var(--gh-orange)' : 'var(--text-muted)' }}>
+                      {selectedProjectDetails.repositoryCard?.scorecard?.learning || 0}
+                    </span>
+                  </div>
+                  <div className="progress-track">
+                    <div
+                      className="progress-fill"
+                      style={{
+                        width: `${selectedProjectDetails.repositoryCard?.scorecard?.learning || 0}%`,
+                        background: `linear-gradient(90deg, ${selectedPersona === 'learner' ? 'var(--gh-blue)' : 'var(--gh-green)'}, var(--neon-cyan))`
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Project Description */}
             <div className="inspector-section">
               <h4>Project Description</h4>
@@ -3435,7 +3899,7 @@ export default function App() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '12px' }}>🧠</span>
-                  <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--gh-blue)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>AI Evidence Analyst</h4>
+                  <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--gh-blue)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>AI Analyst</h4>
                 </div>
                 
                 {aiExplainLoading && !aiExplainText[selectedProjectDetails.repo] ? (
@@ -3448,7 +3912,7 @@ export default function App() {
                       animation: 'pulse 1.2s infinite'
                     }} />
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                      Generating systems architect synthesis...
+                      Generating repository review...
                     </span>
                   </div>
                 ) : (
